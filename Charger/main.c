@@ -1,7 +1,11 @@
 // core header file from our library project:
 #include "stm8s.h"
+#include "ssd1306.h"
 
-#define NUM_CHANNELS 6
+#define NUM_CHANNELS 	(6)		// Number of balance / LED channels.
+#define MUX_VALUES		(8)   	// Number of values to read from Analogue Mux.
+
+#define PWM_TIMER_BASE	((HSI_VALUE / 40000) - 1)	// PWM Timer reload value (40KHz)
 
 struct _pin {
 	GPIO_TypeDef* port;
@@ -26,7 +30,10 @@ static const struct _pin leds[NUM_CHANNELS] =
   {GPIOC, GPIO_PIN_3}
 };
 
-volatile uint32_t g_timer_tick = 0;
+volatile uint32_t g_timer_tick = 0;     // Global 1ms system timer tick
+
+volatile uint16_t adc_values[MUX_VALUES + 3];   // Values read from ADC
+uint8_t adc_input = 0;                          // Current input being sampled
 
 /*
  * System timer ISR
@@ -37,10 +44,20 @@ void tim6_isr(void) __interrupt(23)
 	g_timer_tick++;
 }
 
+/*
+ * Delay function based on system timer
+ */
 void delay_ms(uint32_t ms)
 {
 	uint32_t start = g_timer_tick;
 	while (g_timer_tick < start + ms);
+}
+
+/* For some reason ISRs have to be in main??? */
+extern void I2C_ISR2(void);
+void I2C_ISR(void) __interrupt(19)
+{
+    I2C_ISR2();
 }
 
 /*
@@ -134,11 +151,11 @@ void leds_set(uint8_t red, uint8_t green, uint8_t mask)
 	}
 }
 
-#define MUX_VALUES	8
-
-volatile uint16_t adc_values[MUX_VALUES + 3];
-uint8_t adc_input = 0;
-
+/*
+ * ADC ISR
+ * This ISR will cycle through all of the ADC inputs and MUX settings
+ * storing the results in the adc_values[] array.
+ */
 void adc_isr(void) __interrupt(22)
 {
 	adc_values[adc_input] = ADC1_GetConversionValue();
@@ -182,6 +199,10 @@ void adc_isr(void) __interrupt(22)
 	ADC1_StartConversion();
 }
 
+/*
+ * Initialize the MUX and ADC for reading balance channels,
+ * Input Voltage, Battery Voltage and Battery Current.
+ */
 void mux_init(void)
 {
 	// ADC Input pin (MUX Output)
@@ -205,52 +226,99 @@ void mux_init(void)
 	ADC1_StartConversion();
 }
 
+/*
+ * Initialize the Buck / Boost converter PWM outputs.
+ */
 void pwm_init(void)
 {
-	// Configure BUCK and BOOST outputs as GPIO, Low.
+    // Configure Timer 1 as 40KHz PWM timer (disabled).
+	TIM1_DeInit();
+	TIM1_TimeBaseInit(0, TIM1_COUNTERMODE_UP, PWM_TIMER_BASE, 0);
+
+	// Configure BUCK and BOOST outputs as GPIO, Low (Off).
 	GPIO_Init(GPIOC, GPIO_PIN_1, GPIO_MODE_OUT_PP_LOW_FAST);	// Buck
 	GPIO_Init(GPIOC, GPIO_PIN_4, GPIO_MODE_OUT_PP_LOW_FAST);	// Boost
 }
 
-void pwm_set(void)
+/*
+ * Enable or Disable the PWM output.
+ */
+void pwm_enable(bool enable)
 {
-	TIM1_DeInit();
-	/* Time Base configuration */
-	/*
-	TIM1_Period = 4095
-	TIM1_Prescaler = 0
-	TIM1_CounterMode = TIM1_COUNTERMODE_UP
-	TIM1_RepetitionCounter = 0
-	*/
-
-	TIM1_TimeBaseInit(0, TIM1_COUNTERMODE_UP, 399, 0);
-
-	/* Channel 1, 2,3 and 4 Configuration in PWM mode */
-
-	/*
-	TIM1_OCMode = TIM1_OCMODE_PWM2
-	TIM1_OutputState = TIM1_OUTPUTSTATE_ENABLE
-	TIM1_OutputNState = TIM1_OUTPUTNSTATE_ENABLE
-	TIM1_Pulse = CCR1_Val
-	TIM1_OCPolarity = TIM1_OCPOLARITY_LOW
-	TIM1_OCNPolarity = TIM1_OCNPOLARITY_HIGH
-	TIM1_OCIdleState = TIM1_OCIDLESTATE_SET
-	TIM1_OCNIdleState = TIM1_OCIDLESTATE_RESET
-
-	*/
-	TIM1_OC1Init(TIM1_OCMODE_PWM2, TIM1_OUTPUTSTATE_ENABLE, TIM1_OUTPUTNSTATE_ENABLE,
-			   255, TIM1_OCPOLARITY_LOW, TIM1_OCNPOLARITY_HIGH, TIM1_OCIDLESTATE_SET,
-			   TIM1_OCNIDLESTATE_RESET);
-
-	TIM1_OC4Init(TIM1_OCMODE_PWM2, TIM1_OUTPUTSTATE_ENABLE, 127, TIM1_OCPOLARITY_LOW, TIM1_OCIDLESTATE_SET);
-
-	/* TIM1 counter enable */
-	TIM1_Cmd(ENABLE);
-
-	/* TIM1 Main Output Enable */
-	TIM1_CtrlPWMOutputs(ENABLE);
+    if (enable)
+    {
+        /* Enable timer and PWM Outputs */
+        TIM1_Cmd(ENABLE);
+        TIM1_CtrlPWMOutputs(ENABLE);
+    }
+    else
+    {
+        /* Reset timer */
+        pwm_init();
+    }
 }
 
+/*
+ * Set the PWM values.
+ */
+void pwm_set(uint16_t buck, uint16_t boost)
+{
+	if (buck > PWM_TIMER_BASE)
+	{
+		buck = PWM_TIMER_BASE;
+	}
+
+	if (boost > PWM_TIMER_BASE)
+	{
+		boost = PWM_TIMER_BASE;
+	}
+
+    TIM1_OC1Init(TIM1_OCMODE_PWM2, TIM1_OUTPUTSTATE_ENABLE, TIM1_OUTPUTNSTATE_ENABLE,
+               buck, TIM1_OCPOLARITY_LOW, TIM1_OCNPOLARITY_HIGH, TIM1_OCIDLESTATE_SET,
+               TIM1_OCNIDLESTATE_RESET);
+
+    TIM1_OC4Init(TIM1_OCMODE_PWM2, TIM1_OUTPUTSTATE_ENABLE, boost, TIM1_OCPOLARITY_LOW, TIM1_OCIDLESTATE_SET);
+}
+
+void error(uint8_t error_code)
+{
+	uint8_t i;
+
+	// Turn off the PWM
+	pwm_init();
+
+	// Disable the battery FET
+	GPIO_Init(GPIOB, GPIO_PIN_4, GPIO_MODE_OUT_PP_HIGH_SLOW);
+
+	while (1)
+	{
+		leds_set(0x2A, 0x15, 0x3F);
+
+		// Beep the error code out
+		BEEP_Init(BEEP_FREQUENCY_2KHZ);
+		for (i=0; i<error_code; ++i)
+		{
+			// Buzzer
+			BEEP_Cmd(ENABLE);
+			delay_ms(100);
+			BEEP_Cmd(DISABLE);
+			delay_ms(100);
+		}
+
+		for (i=0; i<6; ++i)
+		{
+			// Set Red and Green alternating pattern
+			leds_set(0x2A, 0x15, 0x3F);
+			delay_ms(250);
+			leds_set(0x15, 0x2A, 0x3F);
+			delay_ms(250);
+		}
+	}
+}
+
+/*
+ * Entry Point
+ */
 int main(void)
 {
     /* Reset GPIO ports to a default state */
@@ -272,7 +340,6 @@ int main(void)
 	TIM4_ITConfig(TIM4_IT_UPDATE, ENABLE);
 	TIM4_Cmd(ENABLE);
 
-
 	/* Enable general interrupts */
 	enableInterrupts();
 
@@ -281,23 +348,37 @@ int main(void)
     mux_init();
     balancer_init();
 
+	GPIO_WriteHigh(GPIOD, GPIO_PIN_0);
+    lcd_init();
+
     // Set Red and Green alternating pattern
     leds_set(0x2A, 0x15, 0x3F);
 
 	// Disable the battery FET
-	GPIO_Init(GPIOB, GPIO_PIN_4, GPIO_MODE_OUT_PP_HIGH_SLOW);
-	pwm_init();
+	//GPIO_Init(GPIOB, GPIO_PIN_4, GPIO_MODE_OUT_PP_HIGH_SLOW);
 
 	// Buzzer
-	BEEP_Init(BEEP_FREQUENCY_4KHZ);
+	BEEP_Init(BEEP_FREQUENCY_1KHZ);
 	BEEP_Cmd(ENABLE);
+	delay_ms(150);
+	BEEP_Init(BEEP_FREQUENCY_2KHZ);
+	delay_ms(100);
+	BEEP_Init(BEEP_FREQUENCY_4KHZ);
+	delay_ms(50);
 	BEEP_Cmd(DISABLE);
 
+	//error(5);
+
     // The main loop
+    lcd_set_cusor(0,0);
+    lcd_write_string(" B6 Compact+ Charger ", 0);
     while(1)
     {
 		delay_ms(1000);
+		lcd_set_cusor(0,8);
+		lcd_write_digits(g_timer_tick / 1000, 1);
         // Toggle the output pin
-        GPIO_WriteReverse(GPIOD, GPIO_PIN_0);
+        //GPIO_WriteReverse(GPIOD, GPIO_PIN_0);
     }
 }
+
