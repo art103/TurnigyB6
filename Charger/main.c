@@ -1,47 +1,38 @@
 // core header file from our library project:
 #include "stm8s.h"
+#include "charger.h"
+
+#include "adc.h"
+#include "pwm.h"
+#include "leds.h"
+#include "balancer.h"
+#include "error.h"
 #include "ssd1306.h"
 
-#define NUM_CHANNELS 	(6)		// Number of balance / LED channels.
-#define MUX_VALUES		(8)   	// Number of values to read from Analogue Mux.
-
-#define PWM_TIMER_BASE	((HSI_VALUE / 40000) - 1)	// PWM Timer reload value (40KHz)
-
-struct _pin {
-	GPIO_TypeDef* port;
-	GPIO_Pin_TypeDef pin;
-};
-
-static const struct _pin balancer[NUM_CHANNELS] =
-{ {GPIOD, GPIO_PIN_3},
-  {GPIOD, GPIO_PIN_2},
-  {GPIOD, GPIO_PIN_0},
-  {GPIOC, GPIO_PIN_7},
-  {GPIOC, GPIO_PIN_6},
-  {GPIOC, GPIO_PIN_5}
-};
-
-static const struct _pin leds[NUM_CHANNELS] =
-{ {GPIOB, GPIO_PIN_7},
-  {GPIOB, GPIO_PIN_6},
-  {GPIOB, GPIO_PIN_3},
-  {GPIOF, GPIO_PIN_4},
-  {GPIOC, GPIO_PIN_2},
-  {GPIOC, GPIO_PIN_3}
-};
-
 volatile uint32_t g_timer_tick = 0;     // Global 1ms system timer tick
-
-volatile uint16_t adc_values[MUX_VALUES + 3];   // Values read from ADC
-uint8_t adc_input = 0;                          // Current input being sampled
 
 /*
  * System timer ISR
  */
-void tim6_isr(void) __interrupt(23)
+void system_timer(void) __interrupt(23)
 {
-    TIM4_ClearFlag(TIM4_FLAG_UPDATE);
+#if defined (STM8S903) || defined (STM8AF622x)
+    TIM6->SR1 &= ~(TIM6_FLAG_UPDATE);
+#else
+    TIM4->SR1 &= ~(TIM4_FLAG_UPDATE);
+#endif
 	g_timer_tick++;
+}
+
+/* For some reason ISRs have to be in main??? */
+void _i2c_isr(void) __interrupt(19)
+{
+    i2c_isr();
+}
+
+void _adc_isr(void) __interrupt(22)
+{
+    adc_isr();
 }
 
 /*
@@ -53,267 +44,108 @@ void delay_ms(uint32_t ms)
 	while (g_timer_tick < start + ms);
 }
 
-/* For some reason ISRs have to be in main??? */
-extern void I2C_ISR2(void);
-void I2C_ISR(void) __interrupt(19)
-{
-    I2C_ISR2();
-}
+#define MAX_CELL_V		(4170)	// This is the termination voltage
+#define MIN_CELL_V		(2900)	// This is the minimum voltage to register a cell as usable
+#define CELL_PRESENT_V	(750)	// This is the value to register a cell as present
 
-/*
- * Initialise the balancer GPIOs
- */
-void balancer_init(void)
+#define INITIAL_CHARGE_CURRENT	(500) // This is the charge rate in mA before calculating the battery capacity.
+#define CHARGE_RATE		(1)		// This is the charge rate in C after calculating the battery capacity.
+
+#define BALANCE_CHECK		(5000)
+#define BALANCE_THRESHOLD	(8)	// Threshold in mV from the minimum cell value before balancing.
+
+uint16_t battery_capacity = 0;					// mAh calculated battery capacity.
+uint16_t balance_drop[NUM_CHANNELS] = {0}; 		// mV drop when balancer was enabled.
+uint16_t battery_current = 0;
+uint16_t battery_voltage = 0;
+
+uint8_t balancing;	// Bitmask of cahnnels being balanced.
+uint16_t balance_cells[NUM_CHANNELS] = {0};     // mV of the cells
+
+// ToDo: Move this to EEPROM.
+uint16_t balance_cal[NUM_CHANNELS] = {978, 983, 988, 1001, 985, 985};
+
+uint16_t input_voltage = 0;
+
+uint32_t last_balance_check = 0;
+
+void process_balance_inputs(void)
 {
 	uint8_t i;
-
-	for (i=0; i<NUM_CHANNELS; ++i)
+	uint32_t calc;
+	uint16_t min = MAX_CELL_V;
+	uint16_t max = 0;
+	
+	if ((last_balance_check + BALANCE_CHECK) < g_timer_tick)
 	{
-		GPIO_Init(balancer[i].port, balancer[i].pin, GPIO_MODE_OUT_PP_LOW_SLOW);
-	}
-}
-
-/*
- * channels: bitmask of channel values (1 = on, 0 = off)
- * mask: bitmask of channels to set values for
- */
-void balancer_set(uint8_t channels, uint8_t mask)
-{
-	uint8_t i;
-
-	for (i=0; i<NUM_CHANNELS; ++i)
-	{
-		if (mask & (1 << i) != 0)
+		if ((last_balance_check + BALANCE_CHECK - 100) > g_timer_tick)
 		{
-			if (channels & (1 << i) != 0)
+			// Turn off the balancer to re-check cell values.
+			balancer_off();
+		}
+		return;
+	}
+
+	// Calculate the cell voltages
+	for (i=0; i<NUM_CHANNELS; ++i)
+	{
+		// Apply per-channel calibration values
+		calc = adc_values[i];
+		calc *= balance_cal[i];
+		calc /= 100;
+		balance_cells[i] = calc;
+		
+		if (calc > CELL_PRESENT_V)
+		{
+			if (calc > max)
+				max = calc;
+			if (calc < min)
+				min = calc;
+		}
+		else
+		{
+			balance_cells[i] = 0;
+		}
+	}
+	
+	if ((max - min) > BALANCE_THRESHOLD)
+	{
+		// Work out which cells need reducing.
+		for (i=0; i<NUM_CHANNELS; ++i)
+		{
+			if (balance_cells[i] > (min + BALANCE_THRESHOLD))
 			{
-				GPIO_WriteHigh(balancer[i].port, balancer[i].pin);
+				balancing |= (1 << i);
+				balancer_set(1 << i, 1 << i);
 			}
 			else
 			{
-				GPIO_WriteLow(balancer[i].port, balancer[i].pin);
+				balancing &= ~(1 << i);
+				balancer_set(0, 1 << i);
 			}
 		}
 	}
 }
 
-/*
- * Turn off the balancer
- */
-void balancer_off(void)
+void process_battery_current(void)
 {
-	uint8_t i;
-	for (i=0; i<NUM_CHANNELS; ++i)
-	{
-		GPIO_WriteLow(balancer[i].port, balancer[i].pin);
-	}
+    uint32_t current;
+    current = adc_values[MUX_VALUES];
+    battery_current = current * 1000 / 1024;
 }
 
-/*
- * Initialise the LED GPIOs
- */
-void leds_init(void)
+void process_battery_voltage(void)
 {
-	uint8_t i;
-
-	for (i=0; i<NUM_CHANNELS; ++i)
-	{
-		GPIO_Init(leds[i].port, leds[i].pin, GPIO_MODE_IN_FL_NO_IT);
-	}
+    uint32_t voltage;
+    voltage = adc_values[MUX_VALUES + 1];
+    battery_voltage = voltage * 523 * 5 / 1024;
 }
 
-/*
- * red: bitmask of LEDs to set red
- * green:  bitmask of LEDs to set green
- * mask: bitmask of LEDs to set values for
- */
-void leds_set(uint8_t red, uint8_t green, uint8_t mask)
+void process_input_voltage(void)
 {
-	uint8_t i;
-
-	for (i=0; i<NUM_CHANNELS; ++i)
-	{
-		if (mask & (1 << i) != 0)
-		{
-			if (red & (1 << i) != 0)
-			{
-				GPIO_Init(leds[i].port, leds[i].pin, GPIO_MODE_OUT_PP_HIGH_SLOW);
-			}
-			else if (green & (1 << i) != 0)
-			{
-				GPIO_Init(leds[i].port, leds[i].pin, GPIO_MODE_OUT_PP_LOW_SLOW);
-			}
-			else
-			{
-				GPIO_Init(leds[i].port, leds[i].pin, GPIO_MODE_IN_FL_NO_IT);
-			}
-		}
-	}
-}
-
-/*
- * ADC ISR
- * This ISR will cycle through all of the ADC inputs and MUX settings
- * storing the results in the adc_values[] array.
- */
-void adc_isr(void) __interrupt(22)
-{
-	adc_values[adc_input] = ADC1_GetConversionValue();
-
-	ADC1_ClearFlag(ADC1_FLAG_EOC);
-
-	if (adc_input < MUX_VALUES)
-	{
-		// Set Mux Input
-		GPIO_Write(GPIOA, adc_input);
-		// Read Mux Value
-		ADC1_ConversionConfig(ADC1_CONVERSIONMODE_SINGLE, ADC1_CHANNEL_6, ADC1_ALIGN_RIGHT);
-	}
-	else
-	{
-		switch (adc_input - MUX_VALUES)
-		{
-			case 0:
-				// Read Batt Current
-				ADC1_ConversionConfig(ADC1_CONVERSIONMODE_SINGLE, ADC1_CHANNEL_0, ADC1_ALIGN_RIGHT);
-			break;
-
-			case 1:
-				// Read Batt Voltage
-				ADC1_ConversionConfig(ADC1_CONVERSIONMODE_SINGLE, ADC1_CHANNEL_1, ADC1_ALIGN_RIGHT);
-			break;
-
-			case 2:
-				// Read Input Voltage
-				ADC1_ConversionConfig(ADC1_CONVERSIONMODE_SINGLE, ADC1_CHANNEL_2, ADC1_ALIGN_RIGHT);
-			break;
-		}
-	}
-
-	adc_input++;
-	if (adc_input > MUX_VALUES + 2)
-	{
-		adc_input = 0;
-	}
-
-	ADC1_StartConversion();
-}
-
-/*
- * Initialize the MUX and ADC for reading balance channels,
- * Input Voltage, Battery Voltage and Battery Current.
- */
-void mux_init(void)
-{
-	// ADC Input pin (MUX Output)
-	GPIO_Init(GPIOD, GPIO_PIN_6, GPIO_MODE_IN_FL_NO_IT);
-
-	// MUX Control pins
-	GPIO_Init(GPIOA, GPIO_PIN_1, GPIO_MODE_OUT_PP_LOW_SLOW);
-	GPIO_Init(GPIOA, GPIO_PIN_2, GPIO_MODE_OUT_PP_LOW_SLOW);
-	GPIO_Init(GPIOA, GPIO_PIN_3, GPIO_MODE_OUT_PP_LOW_SLOW);
-
-
-	ADC1_DeInit();
-	ADC1_Init(ADC1_CONVERSIONMODE_SINGLE, ADC1_CHANNEL_6, ADC1_PRESSEL_FCPU_D2, \
-			ADC1_EXTTRIG_TIM, DISABLE, ADC1_ALIGN_RIGHT, ADC1_SCHMITTTRIG_CHANNEL6,\
-			DISABLE);
-
-	/* Enable EOC interrupt */
-	ADC1_ITConfig(ADC1_IT_EOCIE, ENABLE);
-
-	/* Start Conversion */
-	ADC1_StartConversion();
-}
-
-/*
- * Initialize the Buck / Boost converter PWM outputs.
- */
-void pwm_init(void)
-{
-    // Configure Timer 1 as 40KHz PWM timer (disabled).
-	TIM1_DeInit();
-	TIM1_TimeBaseInit(0, TIM1_COUNTERMODE_UP, PWM_TIMER_BASE, 0);
-
-	// Configure BUCK and BOOST outputs as GPIO, Low (Off).
-	GPIO_Init(GPIOC, GPIO_PIN_1, GPIO_MODE_OUT_PP_LOW_FAST);	// Buck
-	GPIO_Init(GPIOC, GPIO_PIN_4, GPIO_MODE_OUT_PP_LOW_FAST);	// Boost
-}
-
-/*
- * Enable or Disable the PWM output.
- */
-void pwm_enable(bool enable)
-{
-    if (enable)
-    {
-        /* Enable timer and PWM Outputs */
-        TIM1_Cmd(ENABLE);
-        TIM1_CtrlPWMOutputs(ENABLE);
-    }
-    else
-    {
-        /* Reset timer */
-        pwm_init();
-    }
-}
-
-/*
- * Set the PWM values.
- */
-void pwm_set(uint16_t buck, uint16_t boost)
-{
-	if (buck > PWM_TIMER_BASE)
-	{
-		buck = PWM_TIMER_BASE;
-	}
-
-	if (boost > PWM_TIMER_BASE)
-	{
-		boost = PWM_TIMER_BASE;
-	}
-
-    TIM1_OC1Init(TIM1_OCMODE_PWM2, TIM1_OUTPUTSTATE_ENABLE, TIM1_OUTPUTNSTATE_ENABLE,
-               buck, TIM1_OCPOLARITY_LOW, TIM1_OCNPOLARITY_HIGH, TIM1_OCIDLESTATE_SET,
-               TIM1_OCNIDLESTATE_RESET);
-
-    TIM1_OC4Init(TIM1_OCMODE_PWM2, TIM1_OUTPUTSTATE_ENABLE, boost, TIM1_OCPOLARITY_LOW, TIM1_OCIDLESTATE_SET);
-}
-
-void error(uint8_t error_code)
-{
-	uint8_t i;
-
-	// Turn off the PWM
-	pwm_init();
-
-	// Disable the battery FET
-	GPIO_Init(GPIOB, GPIO_PIN_4, GPIO_MODE_OUT_PP_HIGH_SLOW);
-
-	while (1)
-	{
-		leds_set(0x2A, 0x15, 0x3F);
-
-		// Beep the error code out
-		BEEP_Init(BEEP_FREQUENCY_2KHZ);
-		for (i=0; i<error_code; ++i)
-		{
-			// Buzzer
-			BEEP_Cmd(ENABLE);
-			delay_ms(100);
-			BEEP_Cmd(DISABLE);
-			delay_ms(100);
-		}
-
-		for (i=0; i<6; ++i)
-		{
-			// Set Red and Green alternating pattern
-			leds_set(0x2A, 0x15, 0x3F);
-			delay_ms(250);
-			leds_set(0x15, 0x2A, 0x3F);
-			delay_ms(250);
-		}
-	}
+    uint32_t voltage;
+    voltage = adc_values[MUX_VALUES + 2];
+    input_voltage = voltage * 700 * 5 / 1024;
 }
 
 /*
@@ -321,6 +153,7 @@ void error(uint8_t error_code)
  */
 int main(void)
 {
+    uint16_t boost = 0;
     /* Reset GPIO ports to a default state */
     GPIO_DeInit(GPIOA);
     GPIO_DeInit(GPIOB);
@@ -330,22 +163,30 @@ int main(void)
     GPIO_DeInit(GPIOF);
 
     /* Set CPU to 16MHz internal RC clock */
-    CLK_SYSCLKConfig(CLK_PRESCALER_CPUDIV1);
-    CLK_SYSCLKConfig(CLK_PRESCALER_HSIDIV1);
-	CLK_ClockSwitchConfig(CLK_SWITCHMODE_AUTO, CLK_SOURCE_HSI, DISABLE, CLK_CURRENTCLOCKSTATE_DISABLE);
+    CLK->CKDIVR &= ~CLK_CKDIVR_HSIDIV;
+    CLK->CKDIVR |= CLK_PRESCALER_HSIDIV1;
+    CLK->CKDIVR &= ~CLK_CKDIVR_CPUDIV;
+    CLK->CKDIVR |= CLK_PRESCALER_CPUDIV1;
 
 	/* Configure the system timer (1ms ticks) */
+#if defined (STM8S903) || defined (STM8AF622x)
+    TIM6->ARR = HSI_VALUE / 64 / 1000;
+    TIM6->PSCR = TIM6_PRESCALER_64;
+	TIM6->IER |= TIM6_IT_UPDATE;
+	TIM6->CR1 |= TIM6_CR1_CEN;
+#else
 	TIM4_DeInit();
 	TIM4_TimeBaseInit(TIM4_PRESCALER_64, HSI_VALUE / 64 / 1000);
 	TIM4_ITConfig(TIM4_IT_UPDATE, ENABLE);
 	TIM4_Cmd(ENABLE);
+#endif
 
 	/* Enable general interrupts */
 	enableInterrupts();
 
 	pwm_init();
     leds_init();
-    mux_init();
+    adc_init();
     balancer_init();
 
 	GPIO_WriteHigh(GPIOD, GPIO_PIN_0);
@@ -355,30 +196,99 @@ int main(void)
     leds_set(0x2A, 0x15, 0x3F);
 
 	// Disable the battery FET
-	//GPIO_Init(GPIOB, GPIO_PIN_4, GPIO_MODE_OUT_PP_HIGH_SLOW);
+	GPIO_Init(GPIOB, GPIO_PIN_4, GPIO_MODE_OUT_PP_HIGH_SLOW);
 
 	// Buzzer
-	BEEP_Init(BEEP_FREQUENCY_1KHZ);
-	BEEP_Cmd(ENABLE);
+    BEEP->CSR &= ~BEEP_CSR_BEEPDIV;
+    BEEP->CSR |= BEEP_CALIBRATION_DEFAULT;
+
+    BEEP->CSR &= ~BEEP_CSR_BEEPSEL;
+    BEEP->CSR |= BEEP_FREQUENCY_1KHZ;
+
+	BEEP->CSR |= BEEP_CSR_BEEPEN;
 	delay_ms(150);
-	BEEP_Init(BEEP_FREQUENCY_2KHZ);
+    BEEP->CSR &= ~BEEP_CSR_BEEPSEL;
+    BEEP->CSR |= BEEP_FREQUENCY_2KHZ;
+
 	delay_ms(100);
-	BEEP_Init(BEEP_FREQUENCY_4KHZ);
+    BEEP->CSR &= ~BEEP_CSR_BEEPSEL;
+    BEEP->CSR |= BEEP_FREQUENCY_4KHZ;
 	delay_ms(50);
-	BEEP_Cmd(DISABLE);
+
+	BEEP->CSR &= ~BEEP_CSR_BEEPEN;
 
 	//error(5);
+
+	pwm_enable(TRUE);
+	pwm_set(PWM_TIMER_BASE / 2, 0);
 
     // The main loop
     lcd_set_cusor(0,0);
     lcd_write_string(" B6 Compact+ Charger ", 0);
+
+	// Battery and Input stats
+    lcd_set_cusor(0, 56);
+    lcd_write_string("Vi:", 1);
+    lcd_set_cusor(60, 48);
+    lcd_write_string("Ib:", 1);
+    lcd_set_cusor(60, 56);
+    lcd_write_string("Vb:", 1);
+
     while(1)
     {
-		delay_ms(1000);
-		lcd_set_cusor(0,8);
-		lcd_write_digits(g_timer_tick / 1000, 1);
-        // Toggle the output pin
-        //GPIO_WriteReverse(GPIOD, GPIO_PIN_0);
+        int i;
+        uint16_t tmp1;
+        uint16_t tmp2;
+
+		for (i=0; i<NUM_CHANNELS; ++i)
+		{
+            tmp1 = balance_cells[i] / 10;
+            tmp2 = tmp1 / 100;
+
+			lcd_set_cusor(0, 8 * (i+1));
+			lcd_write_digits(tmp2, 1);
+			lcd_write_string(".", 1);
+            lcd_write_digits(tmp1 - (tmp2 * 100), 1);
+			lcd_write_string("   ", 1);
+			lcd_set_cusor(24, 8 * (i+1));
+			lcd_write_string("V ", 1);
+			
+			if (balancing & (1 << i))
+			{
+				lcd_write_string("Bal", 1);
+			}
+			else
+			{
+				lcd_write_string("   ", 1);
+			}
+		}
+
+        leds_set(0x2A, 0x15, 0x3F);
+
+		lcd_set_cusor(78, 48);
+		lcd_write_digits(battery_current, 1);
+		lcd_write_string("mA   ", 1);
+
+		tmp1 = input_voltage;
+		tmp2 = tmp1 / 100;
+		lcd_set_cusor(18, 56);
+		lcd_write_digits(tmp2, 1);
+		lcd_write_char('.', 1);
+		lcd_write_digits(tmp1 - (tmp2 * 100), 1);
+		lcd_write_string("v ", 1);
+
+		tmp1 = battery_voltage;
+		tmp2 = tmp1 / 100;
+		lcd_set_cusor(78, 56);
+		lcd_write_digits(tmp2, 1);
+		lcd_write_char('.', 1);
+		lcd_write_digits(tmp1 - (tmp2 * 100), 1);
+		lcd_write_string("v ", 1);
+
+        leds_set(0x15, 0x2A, 0x3F);
+
+		//delay_ms(50);
+		adc_sweep();
     }
 }
 

@@ -55,6 +55,8 @@
 #define SSD1306_EXTERNALVCC 0x1
 #define SSD1306_SWITCHCAPVCC 0x2
 
+void i2c_isr(void);
+
 int lcd_init(void);
 void lcd_write_char(uint8_t c, uint8_t colour);
 void lcd_write_string(char *s, uint8_t colour);

@@ -11,7 +11,7 @@
 
 #define MAX_BUFFER_SIZE		(8)
 #define SLAVE_ADDRESS		(0x3C << 1)
-#define I2C_SPEED 			(100000)
+#define I2C_SPEED 			(400000)
 
 
 static uint8_t char_height = 7;
@@ -31,7 +31,7 @@ extern void delay_ms(uint32_t ms);
   * @retval
   * None
   */
-void I2C_ISR2(void)
+void i2c_isr(void)
 {
 	switch (I2C_GetLastEvent())
 	{
@@ -147,7 +147,6 @@ int lcd_init(void)
 	int ret;
 
 	/* I2C Initialize */
-	I2C_DeInit();
 	I2C_Init(I2C_SPEED, 0xA0, I2C_DUTYCYCLE_2, I2C_ACK_CURR, I2C_ADDMODE_7BIT, 16);
 
 	// 128x64 OLED "Crius"
