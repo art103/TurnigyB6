@@ -149,6 +149,7 @@
 		</Unit>
 		<Unit filename="src/stm8s_gpio.c">
 			<Option compilerVar="CC" />
+			<Option target="libSTM8S105" />
 		</Unit>
 		<Unit filename="src/stm8s_i2c.c">
 			<Option compilerVar="CC" />
@@ -171,6 +172,7 @@
 		</Unit>
 		<Unit filename="src/stm8s_tim1.c">
 			<Option compilerVar="CC" />
+			<Option target="libSTM8S105" />
 		</Unit>
 		<Unit filename="src/stm8s_tim2.c">
 			<Option compilerVar="CC" />

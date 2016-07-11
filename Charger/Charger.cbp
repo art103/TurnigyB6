@@ -58,6 +58,10 @@
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="error.h" />
+		<Unit filename="gpio.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="gpio.h" />
 		<Unit filename="lcdfont_medium.h" />
 		<Unit filename="leds.c">
 			<Option compilerVar="CC" />

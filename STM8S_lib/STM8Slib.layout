@@ -1,29 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
 <CodeBlocks_layout_file>
 	<ActiveTarget name="libSTM8S903" />
-	<File name="src/stm8s_tim6.c" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+	<File name="src/stm8s_adc1.c" open="0" top="0" tabpos="1" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="9736" topLine="303" />
-		</Cursor>
-	</File>
-	<File name="inc/stm8s_tim6.h" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="8940" topLine="188" />
-		</Cursor>
-	</File>
-	<File name="inc/stm8s_beep.h" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="0" topLine="8" />
-		</Cursor>
-	</File>
-	<File name="src/stm8s_beep.c" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="3423" topLine="78" />
-		</Cursor>
-	</File>
-	<File name="src/stm8s_gpio.c" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="5203" topLine="129" />
+			<Cursor1 position="12563" topLine="323" />
 		</Cursor>
 	</File>
 	<File name="src/stm8s_itc.c" open="0" top="0" tabpos="3" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
@@ -31,24 +11,9 @@
 			<Cursor1 position="2394" topLine="276" />
 		</Cursor>
 	</File>
-	<File name="src/stm8s_i2c.c" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+	<File name="src/stm8s_beep.c" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="6018" topLine="135" />
-		</Cursor>
-	</File>
-	<File name="inc/stm8s_adc1.h" open="0" top="0" tabpos="6" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="15036" topLine="299" />
-		</Cursor>
-	</File>
-	<File name="src/stm8s_tim1.c" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="79124" topLine="2180" />
-		</Cursor>
-	</File>
-	<File name="src/stm8s_adc1.c" open="0" top="0" tabpos="1" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="12563" topLine="323" />
+			<Cursor1 position="3423" topLine="78" />
 		</Cursor>
 	</File>
 	<File name="inc/stm8s_i2c.h" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
@@ -56,14 +21,19 @@
 			<Cursor1 position="1015" topLine="0" />
 		</Cursor>
 	</File>
-	<File name="src/stm8s_clk.c" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+	<File name="src/stm8s_tim1.c" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="15199" topLine="495" />
+			<Cursor1 position="79124" topLine="2180" />
 		</Cursor>
 	</File>
-	<File name="src/stm8s_flash.c" open="0" top="0" tabpos="2" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+	<File name="src/stm8s_gpio.c" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="6284" topLine="156" />
+			<Cursor1 position="5203" topLine="129" />
+		</Cursor>
+	</File>
+	<File name="inc/stm8s_beep.h" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="0" topLine="8" />
 		</Cursor>
 	</File>
 	<File name="src/stm8s_tim4.c" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
@@ -71,9 +41,39 @@
 			<Cursor1 position="12158" topLine="384" />
 		</Cursor>
 	</File>
+	<File name="src/stm8s_tim6.c" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="9736" topLine="303" />
+		</Cursor>
+	</File>
 	<File name="src/stm8s_tim2.c" open="0" top="0" tabpos="4" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
 			<Cursor1 position="39537" topLine="1095" />
+		</Cursor>
+	</File>
+	<File name="inc/stm8s_tim6.h" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="8940" topLine="188" />
+		</Cursor>
+	</File>
+	<File name="src/stm8s_flash.c" open="0" top="0" tabpos="2" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="6284" topLine="156" />
+		</Cursor>
+	</File>
+	<File name="inc/stm8s_adc1.h" open="0" top="0" tabpos="6" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="15036" topLine="299" />
+		</Cursor>
+	</File>
+	<File name="src/stm8s_clk.c" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="15199" topLine="495" />
+		</Cursor>
+	</File>
+	<File name="src/stm8s_i2c.c" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="6018" topLine="135" />
 		</Cursor>
 	</File>
 </CodeBlocks_layout_file>
