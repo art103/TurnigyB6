@@ -10,14 +10,16 @@ void error(uint8_t error_code)
 {
 	uint8_t i;
 
+	state = STATE_ERROR;
+	
 	// Turn off the PWM
-	pwm_init();
-
-	// Disable the battery FET
-	GPIO_Init(GPIOB, GPIO_PIN_4, GPIO_MODE_OUT_PP_HIGH_SLOW);
+	pwm_enable(FALSE);
 
 	while (1)
 	{
+		adc_sweep();
+		update_lcd_info();
+		
 		leds_set(0x2A, 0x15, 0x3F);
 
 		// Beep the error code out

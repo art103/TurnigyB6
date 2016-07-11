@@ -1,6 +1,7 @@
 // core header file from our library project:
 #include "stm8s.h"
 #include "charger.h"
+#include "gpio.h"
 
 static const struct _pin balancer[NUM_CHANNELS] =
 { {GPIOD, GPIO_PIN_3},
@@ -20,7 +21,7 @@ void balancer_init(void)
 
 	for (i=0; i<NUM_CHANNELS; ++i)
 	{
-		GPIO_Init(balancer[i].port, balancer[i].pin, GPIO_MODE_OUT_PP_LOW_SLOW);
+		GPIO_Output(balancer[i].port, balancer[i].pin, 0);
 	}
 }
 

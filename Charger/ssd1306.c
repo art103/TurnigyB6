@@ -13,7 +13,6 @@
 #define SLAVE_ADDRESS		(0x3C << 1)
 #define I2C_SPEED 			(400000)
 
-
 static uint8_t char_height = 7;
 static uint8_t char_width = 5;
 static bool initialized = FALSE;
@@ -220,6 +219,21 @@ int lcd_init(void)
 	ssd1306_command(SSD1306_CMD_SET_PAGE_START | 0x00); // row
 
 	lcd_clear(0);
+
+    lcd_set_cusor(0,0);
+    lcd_write_string(" B6 Compact+ Charger ", 0);
+
+	// Battery and Input stats
+    lcd_set_cusor(0, 8);
+    lcd_write_string("Cl:", 1);
+    lcd_set_cusor(0, 16);
+    lcd_write_string("Vb:", 1);
+    lcd_set_cusor(0, 24);
+    lcd_write_string("Ib:", 1);
+    lcd_set_cusor(0, 32);
+    lcd_write_string("Cb:", 1);
+    lcd_set_cusor(0, 40);
+    lcd_write_string("Vi:", 1);
 
 	return ret;
 }

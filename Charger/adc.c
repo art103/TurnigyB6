@@ -2,9 +2,10 @@
 #include "stm8s.h"
 #include "charger.h"
 #include "error.h"
+#include "gpio.h"
 #include "adc.h"
 
-#define NUMER_OF_SAMPLES    (256)
+#define NUMER_OF_SAMPLES    (512)
 #define ADC_SETTLING_TIME	(10)
 
 /*
@@ -58,12 +59,12 @@ void adc_isr(void)
 void adc_init(void)
 {
 	// ADC Input pin (MUX Output)
-	GPIO_Init(GPIOD, GPIO_PIN_6, GPIO_MODE_IN_FL_NO_IT);
+	GPIO_Input(GPIOD, GPIO_PIN_6);
 
 	// MUX Control pins
-	GPIO_Init(GPIOA, GPIO_PIN_1, GPIO_MODE_OUT_PP_LOW_SLOW);
-	GPIO_Init(GPIOA, GPIO_PIN_2, GPIO_MODE_OUT_PP_LOW_SLOW);
-	GPIO_Init(GPIOA, GPIO_PIN_3, GPIO_MODE_OUT_PP_LOW_SLOW);
+	GPIO_Output(GPIOA, GPIO_PIN_1, 0);
+	GPIO_Output(GPIOA, GPIO_PIN_2, 0);
+	GPIO_Output(GPIOA, GPIO_PIN_3, 0);
 
 	ADC1->CR2 = ADC1_ALIGN_RIGHT;
 	ADC1->CR1 = ADC1_PRESSEL_FCPU_D4;
@@ -91,6 +92,7 @@ void adc_sweep(void)
 
 	for (adc_input=0; adc_input<MUX_VALUES + 3; adc_input++)
 	{
+		ADC1->CSR &= ~ADC1_CSR_CH;
 		if (adc_input < MUX_VALUES)
 		{
 			// Set Mux Input
@@ -110,12 +112,7 @@ void adc_sweep(void)
 				GPIO_WriteLow(GPIOA, GPIO_PIN_3);
 
 			// Read Mux Value
-			if (adc_input == 0)
-			{
-				ADC1->CSR &= ~ADC1_CSR_CH;
-				ADC1->CSR |= ADC1_CHANNEL_6;
-			}
-			delay_ms(ADC_SETTLING_TIME);
+			ADC1->CSR |= ADC1_CHANNEL_6;
 		}
 		else
 		{
@@ -123,26 +120,21 @@ void adc_sweep(void)
 			{
 				case 0:
 					// Read Batt Current
-					ADC1->CSR &= ~ADC1_CSR_CH;
 					ADC1->CSR |= ADC1_CHANNEL_0;
-					delay_ms(ADC_SETTLING_TIME);
 				break;
 
 				case 1:
 					// Read Batt Voltage
-					ADC1->CSR &= ~ADC1_CSR_CH;
 					ADC1->CSR |= ADC1_CHANNEL_1;
-					delay_ms(ADC_SETTLING_TIME);
 				break;
 
 				case 2:
 					// Read Input Voltage
-					ADC1->CSR &= ~ADC1_CSR_CH;
 					ADC1->CSR |= ADC1_CHANNEL_2;
-					delay_ms(ADC_SETTLING_TIME);
 				break;
 			}
 		}
+		delay_ms(ADC_SETTLING_TIME);
 
 		// Trigger the ADC and wait
 		adc_done = 0;		// Work around spurious trigger.

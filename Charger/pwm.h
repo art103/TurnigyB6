@@ -15,4 +15,17 @@ void pwm_enable(bool enable);
  */
 void pwm_set(uint16_t buck, uint16_t boost);
 
+/*
+ * Set the current to current mA (0-5000)
+ */
+void pwm_set_current(uint16_t current);
+
+/*
+ * Check the measured current and adjust 
+ * the PWM accordingly.
+ */
+void pwm_run_pid(void);
+
+void buzzer_init(void);
+
 #endif // _PWM_H_

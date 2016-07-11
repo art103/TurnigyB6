@@ -15,8 +15,26 @@
 				<Option compiler="sdcc" />
 				<Compiler>
 					<Add option="-mstm8 -pstm8" />
+					<Add option="-DSTM8S903" />
+				</Compiler>
+				<Linker>
+					<Add library="../STM8S_lib/lib/libSTM8S903.lib" />
+				</Linker>
+			</Target>
+			<Target title="STM8S-DISCO">
+				<Option platforms="Unix;" />
+				<Option output="$(TARGET_NAME).hex" prefix_auto="0" extension_auto="0" />
+				<Option working_dir="" />
+				<Option object_output="obj" />
+				<Option type="5" />
+				<Option compiler="sdcc" />
+				<Compiler>
+					<Add option="-mstm8 -pstm8" />
 					<Add option="-DSTM8S105" />
 				</Compiler>
+				<Linker>
+					<Add library="../STM8S_lib/lib/libSTM8S105.lib" />
+				</Linker>
 			</Target>
 		</Build>
 		<Compiler>
@@ -24,12 +42,38 @@
 			<Add directory="../STM8S_lib/inc" />
 		</Compiler>
 		<Linker>
-			<Add library="../STM8S_lib/lib/libSTM8S.lib" />
+			<Add option="-lstm8" />
 			<Add directory="../STM8S_lib/lib" />
 		</Linker>
+		<Unit filename="adc.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="adc.h" />
+		<Unit filename="balancer.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="balancer.h" />
+		<Unit filename="charger.h" />
+		<Unit filename="error.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="error.h" />
+		<Unit filename="lcdfont_medium.h" />
+		<Unit filename="leds.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="leds.h" />
 		<Unit filename="main.c">
 			<Option compilerVar="CC" />
 		</Unit>
+		<Unit filename="pwm.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="pwm.h" />
+		<Unit filename="ssd1306.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="ssd1306.h" />
 		<Extensions>
 			<code_completion />
 			<debugger />

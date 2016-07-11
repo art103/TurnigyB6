@@ -1,5 +1,6 @@
 #include "stm8s.h"
 #include "charger.h"
+#include "gpio.h"
 
 static const struct _pin leds[NUM_CHANNELS] =
 { {GPIOB, GPIO_PIN_7},
@@ -19,7 +20,7 @@ void leds_init(void)
 
 	for (i=0; i<NUM_CHANNELS; ++i)
 	{
-		GPIO_Init(leds[i].port, leds[i].pin, GPIO_MODE_IN_FL_NO_IT);
+		GPIO_Input(leds[i].port, leds[i].pin);
 	}
 }
 
@@ -38,15 +39,15 @@ void leds_set(uint8_t red, uint8_t green, uint8_t mask)
 		{
 			if (red & (1 << i) != 0)
 			{
-				GPIO_Init(leds[i].port, leds[i].pin, GPIO_MODE_OUT_PP_HIGH_SLOW);
+				GPIO_Output(leds[i].port, leds[i].pin, 0);
 			}
 			else if (green & (1 << i) != 0)
 			{
-				GPIO_Init(leds[i].port, leds[i].pin, GPIO_MODE_OUT_PP_LOW_SLOW);
+				GPIO_Output(leds[i].port, leds[i].pin, 1);
 			}
 			else
 			{
-				GPIO_Init(leds[i].port, leds[i].pin, GPIO_MODE_IN_FL_NO_IT);
+				GPIO_Input(leds[i].port, leds[i].pin);
 			}
 		}
 	}
