@@ -12,7 +12,6 @@
 
 #define MAX_BUFFER_SIZE		(8)
 #define SLAVE_ADDRESS		(0x3C << 1)
-#define I2C_SPEED 			(400000)
 
 #define CHAR_HEIGHT 7
 #define CHAR_WIDTH  5
@@ -25,6 +24,18 @@ static volatile uint8_t i2c_bytes = 0;
 
 extern volatile uint32_t g_timer_tick;
 extern void delay_ms(uint32_t ms);
+
+I2C_Event_TypeDef I2C_GetLastEvent(void)
+{
+	if ((I2C->SR2 & I2C_SR2_AF) != 0x00)
+	{
+		return I2C_EVENT_SLAVE_ACK_FAILURE;
+	}
+	else
+	{
+		return (I2C->SR3 << 8 | I2C->SR1);
+	}
+}
 
 /**
   * @brief  I2C Interrupt routine
@@ -39,7 +50,7 @@ void i2c_isr(void)
 		/* EV5 */
 		case I2C_EVENT_MASTER_MODE_SELECT :
 			/* Send slave Address for write */
-			I2C_Send7bitAddress(SLAVE_ADDRESS, I2C_DIRECTION_TX);
+			I2C->DR = SLAVE_ADDRESS |I2C_DIRECTION_TX;
 		break;
 
 		/* EV6 */
@@ -47,37 +58,37 @@ void i2c_isr(void)
 			if (i2c_bytes != 0)
 			{
 				/* Send the first Data */
-				I2C_SendData(i2c_buffer[i2c_buffer_index++]);
+				I2C->DR = i2c_buffer[i2c_buffer_index++];
 
 				/* Decrement number of bytes */
 				i2c_bytes--;
 			}
 			if (i2c_bytes == 0)
 			{
-				I2C_ITConfig(I2C_IT_BUF, DISABLE);
+				I2C->ITR &= ~I2C_IT_BUF;
 			}
 		break;
 
 		/* EV8 */
 		case I2C_EVENT_MASTER_BYTE_TRANSMITTING:
 			/* Transmit Data */
-			I2C_SendData(i2c_buffer[i2c_buffer_index++]);
+			I2C->DR = i2c_buffer[i2c_buffer_index++];
 
 			/* Decrement number of bytes */
 			i2c_bytes--;
 
 			if (i2c_bytes == 0)
 			{
-				I2C_ITConfig(I2C_IT_BUF, DISABLE);
+				I2C->ITR &= ~I2C_IT_BUF;
 			}
 		break;
 
 		/* EV8_2 */
 		case I2C_EVENT_MASTER_BYTE_TRANSMITTED:
 			/* Send STOP condition */
-			I2C_GenerateSTOP(ENABLE);
+			I2C->CR2 |= I2C_CR2_STOP;
 
-			I2C_ITConfig(I2C_IT_EVT, DISABLE);
+			I2C->ITR &= ~I2C_IT_EVT;
 		break;
 
 		default:
@@ -106,10 +117,10 @@ static int ssd1306_data_block(uint8_t *dat, uint16_t len, uint8_t is_data)
 	}
 
 	/* Enable Buffer and Event Interrupt*/
-	I2C_ITConfig((I2C_IT_TypeDef)(I2C_IT_EVT | I2C_IT_BUF), ENABLE);
+	I2C->ITR |= I2C_IT_EVT | I2C_IT_BUF;
 
 	/* Send START condition */
-	I2C_GenerateSTART(ENABLE);
+	I2C->CR2 |= I2C_CR2_START;
 
 	// Wait for the transfer to complete.
 	while (i2c_bytes)
@@ -117,7 +128,7 @@ static int ssd1306_data_block(uint8_t *dat, uint16_t len, uint8_t is_data)
 		if (timeout + 50 < g_timer_tick)
 			break;
 	}
-	while (I2C_GetFlagStatus(I2C_FLAG_BUSBUSY))
+	while ((I2C->SR3 & (I2C_FLAG_BUSBUSY & 0xff)) != 0)
 	{
 		if (timeout + 50 < g_timer_tick)
 			break;
@@ -148,8 +159,30 @@ int lcd_init(void)
 	int ret;
 
 	/* I2C Initialize */
-	I2C_Init(I2C_SPEED, 0xA0, I2C_DUTYCYCLE_2, I2C_ACK_CURR, I2C_ADDMODE_7BIT, 16);
+	
+	/* Set input freq and disable */
+	I2C->FREQR = 16;
+	I2C->CR1 &= ~I2C_CR1_PE;
 
+	/* Set rise time */
+	I2C->TRISER = 6;
+
+	/* Configure divisor */
+	I2C->CCRL = 13;
+	I2C->CCRH = I2C_CCRH_FS;
+
+	/* Enable I2C */
+	I2C->CR1 |= I2C_CR1_PE;
+
+    /* Enable the acknowledgement */
+    I2C->CR2 |= I2C_CR2_ACK;
+	/* Configure (N)ACK on current byte */
+	I2C->CR2 &= ~I2C_CR2_POS;
+	
+	/* Own address */
+	I2C->OARL = 0xA0;
+	I2C->OARH = I2C_ADDMODE_7BIT | I2C_OARH_ADDCONF;
+                   
 	// 128x64 OLED "Crius"
 	initialized = TRUE;
 

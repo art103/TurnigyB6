@@ -17,9 +17,6 @@
 					<Add option="-mstm8 -pstm8" />
 					<Add option="-DSTM8S903" />
 				</Compiler>
-				<Linker>
-					<Add library="../STM8S_lib/lib/libSTM8S903.lib" />
-				</Linker>
 			</Target>
 			<Target title="STM8S-DISCO">
 				<Option platforms="Unix;" />
@@ -32,9 +29,6 @@
 					<Add option="-mstm8 -pstm8" />
 					<Add option="-DSTM8S105" />
 				</Compiler>
-				<Linker>
-					<Add library="../STM8S_lib/lib/libSTM8S105.lib" />
-				</Linker>
 			</Target>
 		</Build>
 		<Compiler>
