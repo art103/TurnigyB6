@@ -3,6 +3,9 @@
 #include "charger.h"
 #include "gpio.h"
 
+/*
+ * Mapping of balancer channels to GPIOs
+ */
 static const struct _pin balancer[NUM_CHANNELS] =
 { {GPIOD, GPIO_PIN_3},
   {GPIOD, GPIO_PIN_2},
@@ -17,12 +20,12 @@ static const struct _pin balancer[NUM_CHANNELS] =
  */
 void balancer_init(void)
 {
-	uint8_t i;
+    uint8_t i;
 
-	for (i=0; i<NUM_CHANNELS; ++i)
-	{
-		GPIO_Output(balancer[i].port, balancer[i].pin, 0);
-	}
+    for (i=0; i<NUM_CHANNELS; ++i)
+    {
+        GPIO_Output(balancer[i].port, balancer[i].pin, 0);
+    }
 }
 
 /*
@@ -31,22 +34,22 @@ void balancer_init(void)
  */
 void balancer_set(uint8_t channels, uint8_t mask)
 {
-	uint8_t i;
+    uint8_t i;
 
-	for (i=0; i<NUM_CHANNELS; ++i)
-	{
-		if (mask & (1 << i) != 0)
-		{
-			if (channels & (1 << i) != 0)
-			{
-				GPIO_WriteHigh(balancer[i].port, balancer[i].pin);
-			}
-			else
-			{
-				GPIO_WriteLow(balancer[i].port, balancer[i].pin);
-			}
-		}
-	}
+    for (i=0; i<NUM_CHANNELS; ++i)
+    {
+        if (mask & (1 << i) != 0)
+        {
+            if (channels & (1 << i) != 0)
+            {
+                GPIO_WriteHigh(balancer[i].port, balancer[i].pin);
+            }
+            else
+            {
+                GPIO_WriteLow(balancer[i].port, balancer[i].pin);
+            }
+        }
+    }
 }
 
 /*
@@ -54,12 +57,12 @@ void balancer_set(uint8_t channels, uint8_t mask)
  */
 void balancer_off(void)
 {
-	uint8_t i;
-	for (i=0; i<NUM_CHANNELS; ++i)
-	{
-		GPIO_WriteLow(balancer[i].port, balancer[i].pin);
-	}
-	balancing = 0;
+    uint8_t i;
+    for (i=0; i<NUM_CHANNELS; ++i)
+    {
+        GPIO_WriteLow(balancer[i].port, balancer[i].pin);
+    }
+    balancing = 0;
 }
 
 
@@ -74,7 +77,7 @@ void balance_pack(void)
 
     call_count++;
 
-	// Only balance after 5s measuring and during charging
+    // Only balance after 5s measuring and during charging
     if (call_count == 5 && state == STATE_CHARGING)
     {
         // Cells have had 5s to settle, check them again.

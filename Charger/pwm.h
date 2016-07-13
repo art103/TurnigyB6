@@ -21,13 +21,24 @@ void pwm_set(uint16_t buck, uint16_t boost);
 void pwm_set_current(uint16_t current);
 
 /*
- * Check the measured current and adjust 
+ * Check the measured current and adjust
  * the PWM accordingly.
  */
 void pwm_run_pid(void);
 
+/*
+ * Initialize the BEEP Peripheral
+ */
 void buzzer_init(void);
+
+/*
+ * Turn on the buzzer at freq (Enum).
+ */
 void buzzer_on(uint8_t freq);
+
+/*
+ * Turn off the buzzer.
+ */
 void buzzer_off(void);
 
 #endif // _PWM_H_

@@ -1,7 +1,10 @@
 #ifndef _ADC_H_
 #define _ADC_H_
 
-extern volatile uint16_t adc_values[MUX_VALUES + 3];   // Values read from ADC
+/*
+ * Values read from ADC
+ */
+extern volatile uint16_t adc_values[MUX_VALUES + 3];
 
 /*
  * ADC ISR
@@ -16,7 +19,10 @@ void adc_isr(void);
  */
 void adc_init(void);
 
+/*
+ * Sweep through all of the ADC inputs gathering over sampled
+ * values.
+ */
 void adc_sweep(void);
-
 
 #endif // _ADC_H_

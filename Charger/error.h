@@ -1,14 +1,18 @@
 #ifndef _ERROR_H_
 #define _ERROR_H_
 
+/*
+ * Error codes.
+ * These will be beeped out when there is an error.
+ */
 enum
 {
-	ERROR_DONE = 2,
-	ERROR_INPUT_VOLTAGE,
-	ERROR_PACK_VOLTAGE,
-	ERROR_TIMEOUT,
-	ERROR_LOW_VOLTAGE_CELL,
-	ERROR_HIGH_VOLTAGE_CELL,
+    ERROR_DONE = 2,
+    ERROR_INPUT_VOLTAGE,
+    ERROR_PACK_VOLTAGE,
+    ERROR_TIMEOUT,
+    ERROR_LOW_VOLTAGE_CELL,
+    ERROR_HIGH_VOLTAGE_CELL,
 };
 
 /*
