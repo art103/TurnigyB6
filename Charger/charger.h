@@ -18,7 +18,7 @@
 #define BATTERY_MEASURE_TIME	(3000)	// Number of ms to measure the battery voltage increase over.
 #define BATTERY_MEASURE_DELAY	(3000)
 
-//#define ENABLE_EXTRA_LCD_INFO	// Nice output, but may blow the flash limit.
+#define ENABLE_EXTRA_LCD_INFO	// Nice output, but may blow the flash limit.
 
 struct _pin {
 	GPIO_TypeDef* port;
