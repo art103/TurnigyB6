@@ -2,6 +2,7 @@
 
 #include "ssd1306.h"
 #include "lcdfont_medium.h"
+#include "charger.h"
 
 #define LCD_WIDTH 128
 #define LCD_HEIGHT 64
@@ -13,8 +14,9 @@
 #define SLAVE_ADDRESS		(0x3C << 1)
 #define I2C_SPEED 			(400000)
 
-static uint8_t char_height = 7;
-static uint8_t char_width = 5;
+#define CHAR_HEIGHT 7
+#define CHAR_WIDTH  5
+
 static bool initialized = FALSE;
 
 static volatile uint8_t i2c_buffer[MAX_BUFFER_SIZE];
@@ -220,6 +222,7 @@ int lcd_init(void)
 
 	lcd_clear(0);
 
+#ifdef ENABLE_EXTRA_LCD_INFO
     lcd_set_cusor(0,0);
     lcd_write_string(" B6 Compact+ Charger ", 0);
 
@@ -234,7 +237,7 @@ int lcd_init(void)
     lcd_write_string("Cb:", 1);
     lcd_set_cusor(0, 40);
     lcd_write_string("Vi:", 1);
-
+#endif
 	return ret;
 }
 
@@ -243,9 +246,11 @@ void lcd_write_char(uint8_t c, uint8_t colour)
 	uint8_t x;
 	uint8_t d;
 
+	c -= 32;
+
 	// Send the character.
-	for (x=0; x<char_width; x++ ) {
-		d = font_medium[(c*char_width)+x];
+	for (x=0; x<CHAR_WIDTH; x++ ) {
+		d = font_medium[(c*CHAR_WIDTH)+x];
 		if (colour == 0)
 			d = ~d;
 		ssd1306_data(&d, 1);
@@ -317,8 +322,8 @@ void lcd_clear(uint8_t colour)
 
 void lcd_set_cusor(uint8_t x, uint8_t y)
 {
-    if ((y+char_height) >= LCD_HEIGHT) return;
-    if ((x+char_width) >= LCD_WIDTH) return;
+    if ((y+CHAR_HEIGHT) >= LCD_HEIGHT) return;
+    if ((x+CHAR_WIDTH) >= LCD_WIDTH) return;
 
 	// Set CGRAM Location
 	ssd1306_command(SSD1306_CMD_SET_LOW_COLUMN  | (x & 0x0f)); // low col

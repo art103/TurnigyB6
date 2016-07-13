@@ -59,4 +59,46 @@ void balancer_off(void)
 	{
 		GPIO_WriteLow(balancer[i].port, balancer[i].pin);
 	}
+	balancing = 0;
+}
+
+
+/*
+ * Called every 5s.
+ * Each cell ADC step ~= 10mV
+ */
+void balance_pack(void)
+{
+    static uint8_t call_count = 0;
+    uint8_t i;
+
+    call_count++;
+
+    if (call_count == 5 && state == STATE_CHARGING)
+    {
+        // Cells have had 5s to settle, check them again.
+        if ((cell_max - cell_min) > BALANCE_THRESHOLD)
+        {
+            // Work out which cells need reducing.
+            for (i=0; i<NUM_CHANNELS; ++i)
+            {
+                if (balance_avg[i] > (cell_min + BALANCE_THRESHOLD))
+                {
+                    balancing |= (1 << i);
+                    balancer_set(1 << i, 1 << i);
+                }
+            }
+        }
+        else
+        {
+            // All ok, check again in 5s.
+            call_count = 0;
+        }
+    }
+    else if (call_count >= 20)
+    {
+        // 15s of balancing then let the cells settle for 5s.
+        balancer_off();
+        call_count = 0;
+    }
 }

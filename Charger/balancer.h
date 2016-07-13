@@ -17,4 +17,11 @@ void balancer_set(uint8_t channels, uint8_t mask);
  */
 void balancer_off(void);
 
+/*
+ * Called every 5s.
+ * Each cell ADC step ~= 10mV
+ */
+void balance_pack(void);
+
+
 #endif // _BALANCER_H_

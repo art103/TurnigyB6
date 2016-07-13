@@ -6,6 +6,7 @@
 void GPIO_Output(GPIO_TypeDef* GPIOx, GPIO_Pin_TypeDef GPIO_Pin, uint8_t state)
 {
 	GPIOx->CR2 &= ~(GPIO_Pin);
+	GPIOx->CR1 |= GPIO_Pin;
 
 	if (state)
 	{
@@ -13,7 +14,7 @@ void GPIO_Output(GPIO_TypeDef* GPIOx, GPIO_Pin_TypeDef GPIO_Pin, uint8_t state)
 	}
 	else /* Low level */
 	{
-		GPIOx->ODR &= ~(GPIO_Pin);
+		GPIOx->ODR &= (uint8_t)(~(GPIO_Pin));
 	}
 	
     /* Set Output mode */
@@ -43,5 +44,5 @@ void GPIO_WriteHigh(GPIO_TypeDef* GPIOx, GPIO_Pin_TypeDef PortPins)
  */
 void GPIO_WriteLow(GPIO_TypeDef* GPIOx, GPIO_Pin_TypeDef PortPins)
 {
-	GPIOx->ODR &= ~PortPins;
+	GPIOx->ODR &= 0xFF ^ PortPins;
 }

@@ -43,6 +43,9 @@
 		</Compiler>
 		<Linker>
 			<Add option="-lstm8" />
+			<Add option="--code-size 8192" />
+			<Add option="--iram-size 1024" />
+			<Add option="--xram-loc 0x4000" />
 			<Add directory="../STM8S_lib/lib" />
 		</Linker>
 		<Unit filename="adc.c">

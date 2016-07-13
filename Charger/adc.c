@@ -5,8 +5,8 @@
 #include "gpio.h"
 #include "adc.h"
 
-#define NUMER_OF_SAMPLES    (512)
-#define ADC_SETTLING_TIME	(10)
+#define NUMER_OF_SAMPLES    (16)
+#define ADC_SETTLING_TIME	(0)
 
 /*
 0 - Cell 4
@@ -37,7 +37,7 @@ void adc_isr(void)
 {
 	sample_total += ADC1->DRL | (ADC1->DRH << 8);
 	conversions++;
-	
+
 	// Clear Flag
     //ADC1->CSR &= (~ADC1_FLAG_EOC);
 	ADC1_ClearFlag(ADC1_FLAG_EOC);	// WHY! Does only this work???
@@ -87,6 +87,7 @@ void adc_init(void)
 void adc_sweep(void)
 {
 	uint8_t adc_input;
+    uint32_t tmp;
 
 	adc_done = 0;
 
@@ -153,23 +154,47 @@ void adc_sweep(void)
 		switch (adc_input)
 		{
 			// All 6 Balance inputs are ready.
-			case MUX_VALUES - 1:
-				process_balance_inputs();
+			case 0:
+			case 1:
+			case 2:
+			case 3:
+			case 4:
+			case 5:
+				// Apply per-channel calibration values
+				tmp = (uint32_t)adc_values[adc_input] * (uint32_t)balance_cal[adc_input] / 100;
+
+				// Only report cells that are above our detection threshold
+				if (tmp < CELL_PRESENT_V)
+				{
+					tmp = 0;
+				}
+				balance_avg[adc_input] += tmp;
+				adc_values[adc_input] = tmp;
 			break;
 
 			// Battery Current
 			case MUX_VALUES:
-				process_battery_current();
+                balance_avg_count++;
+
+                tmp = adc_values[MUX_VALUES];
+                battery_current = (tmp * 10000) / 1225;
+                pwm_curr_avg += battery_current;
+                pwm_curr_count++;
 			break;
 
 			// Battery Voltage
 			case MUX_VALUES + 1:
-				process_battery_voltage();
+                tmp = adc_values[MUX_VALUES + 1];
+                batt_vol_avg += tmp * 523 * 50 / 1024;
+                batt_vol_cnt++;
 			break;
 
 			// Input Voltage
 			case MUX_VALUES + 2:
-				process_input_voltage();
+                tmp = adc_values[MUX_VALUES + 2];
+                tmp *= 700;
+                tmp *= 50;
+                input_voltage = tmp /= 1024;
 			break;
 
 			default:

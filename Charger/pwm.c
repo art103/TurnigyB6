@@ -4,7 +4,7 @@
 #include "gpio.h"
 #include "pwm.h"
 
-#define PWM_TIMER_BASE	((HSI_VALUE / 40000) - 1)	// PWM Timer reload value (40KHz)
+#define PWM_TIMER_BASE	((HSI_VALUE / 10000) - 1)	// PWM Timer reload value (40KHz)
 
 /*
  * Initialize the Buck / Boost converter PWM outputs.
@@ -93,7 +93,7 @@ void pwm_set(uint16_t buck, uint16_t boost)
 	TIM1->CCR4L = (uint8_t)boost;
 }
 
-static uint16_t target_current = 0;
+uint16_t target_current = 0;
 static uint16_t buck_val = 0;
 static uint16_t boost_val = 0;
 
@@ -103,6 +103,9 @@ static uint16_t boost_val = 0;
 void pwm_set_current(uint16_t current)
 {
 	pwm_enable(TRUE);
+
+    if (current > battery_capacity)
+        current = battery_capacity;
 
 	target_current = current;
 	if (battery_voltage > input_voltage)
@@ -123,8 +126,7 @@ void pwm_set_current(uint16_t current)
  */
 void pwm_run_pid(void)
 {
-	//if (target_current > battery_current + (10 * (uint32_t)target_current / 100))	// Stop oscillations.
-	if (target_current > battery_current + 100)	// Stop oscillations.
+	if (target_current > battery_current + (5 * (uint32_t)target_current / 100))	// Stop oscillations.
 	{
 		if (buck_val == PWM_TIMER_BASE)
 		{
