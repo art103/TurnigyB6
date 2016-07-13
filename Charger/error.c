@@ -21,14 +21,14 @@ void error(uint8_t error_code)
     {
         // Buzzer
         buzzer_on(BEEP_FREQUENCY_2KHZ);
-        delay_ms(100);
+        delay_ms(10);
         buzzer_off();
         delay_ms(100);
     }
 
     if (error_code == ERROR_DONE)
     {
-        leds_set(0x3F, 0x00, 0x3F);
+        leds_set(0x00, 0x3F, 0x3F);
     }
     else
     {

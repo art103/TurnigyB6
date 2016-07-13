@@ -190,7 +190,7 @@ void adc_sweep(void)
             case MUX_VALUES + 1:
                 tmp = adc_values[MUX_VALUES + 1];
                 tmp *= calibration[MUX_VALUES + 1];
-                batt_vol_avg += tmp / 1000;
+                batt_vol_avg += tmp / 100;
             break;
 
             // Input Voltage

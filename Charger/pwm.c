@@ -14,15 +14,16 @@ void pwm_init(void)
 {
     // Configure Timer 1 as 40KHz PWM timer (disabled).
     // Set the Autoreload value
-    TIM1->ARRH = PWM_TIMER_BASE >> 8;
-    TIM1->ARRL = PWM_TIMER_BASE;
+	TIM1->ARRH = (uint8_t)(PWM_TIMER_BASE >> 8);
+	TIM1->ARRL = (uint8_t)(PWM_TIMER_BASE);
 
     // Set the Prescaler value
     TIM1->PSCRH = 0;
     TIM1->PSCRL = 0;
 
     // Select the Counter Mode
-    TIM1->CR1 = (TIM1->CR1 & ~(TIM1_CR1_CMS | TIM1_CR1_DIR)) | TIM1_COUNTERMODE_UP;
+	TIM1->CR1 = (uint8_t)((uint8_t)(TIM1->CR1 & (uint8_t)(~(TIM1_CR1_CMS | TIM1_CR1_DIR)))
+						| (uint8_t)(TIM1_COUNTERMODE_UP));
 
     // Set the Repetition Counter value
     TIM1->RCR = 0;
@@ -51,10 +52,8 @@ void pwm_enable(bool enable)
         TIM1->CR1 |= TIM1_CR1_CEN;
         TIM1->BKR |= TIM1_BKR_MOE;
 
-#ifndef ENABLE_LCD
         // Enable the battery FET
-        GPIO_Output(GPIOB, GPIO_PIN_4, 0);
-#endif
+        //GPIO_Output(GPIOB, GPIO_PIN_4, 0);
     }
     else
     {
@@ -66,10 +65,8 @@ void pwm_enable(bool enable)
         GPIO_Output(GPIOC, GPIO_PIN_1, 0);  // Buck
         GPIO_Output(GPIOC, GPIO_PIN_4, 0);  // Boost
 
-#ifndef ENABLE_LCD
         // Disable the battery FET
-        GPIO_Output(GPIOB, GPIO_PIN_4, 1);
-#endif
+        //GPIO_Output(GPIOB, GPIO_PIN_4, 1);
     }
 }
 
@@ -230,5 +227,5 @@ void buzzer_on(uint8_t freq)
  */
 void buzzer_off(void)
 {
-    BEEP->CSR &= ~BEEP_CSR_BEEPSEL;
+    BEEP->CSR &= ~BEEP_CSR_BEEPEN;
 }

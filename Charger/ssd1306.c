@@ -1,9 +1,10 @@
 #include "stm8s.h"
 #include "charger.h"
+#include "gpio.h"
+#include "leds.h"
 
-#ifdef ENABLE_LCD
 #include "ssd1306.h"
-#include "lcdfont_medium.h"
+//#include "lcdfont_medium.h"
 
 #define LCD_WIDTH 128
 #define LCD_HEIGHT 64
@@ -17,7 +18,7 @@
 #define CHAR_HEIGHT 7
 #define CHAR_WIDTH  5
 
-//const uint8_t *font_medium = 0x4000;
+const uint8_t *font_medium = 0x4000;
 
 static bool initialized = FALSE;
 
@@ -30,14 +31,11 @@ extern void delay_ms(uint32_t ms);
 
 I2C_Event_TypeDef I2C_GetLastEvent(void)
 {
-    if ((I2C->SR2 & I2C_SR2_AF) != 0x00)
-    {
-        return I2C_EVENT_SLAVE_ACK_FAILURE;
-    }
-    else
-    {
-        return (I2C->SR3 << 8 | I2C->SR1);
-    }
+	uint16_t flag1 = I2C->SR1;
+	uint16_t flag2 = I2C->SR3;
+
+	/* Get the last event value from I2C status register */
+	return (I2C_Event_TypeDef)((uint16_t)((uint16_t)flag2 << 8) | (uint16_t)flag1);
 }
 
 /**
@@ -53,7 +51,7 @@ void i2c_isr(void)
         /* EV5 */
         case I2C_EVENT_MASTER_MODE_SELECT :
             /* Send slave Address for write */
-            I2C->DR = SLAVE_ADDRESS |I2C_DIRECTION_TX;
+            I2C->DR = SLAVE_ADDRESS | I2C_DIRECTION_TX;
         break;
 
         /* EV6 */
@@ -61,14 +59,14 @@ void i2c_isr(void)
             if (i2c_bytes != 0)
             {
                 /* Send the first Data */
-                I2C->DR = i2c_buffer[i2c_buffer_index++];
+                I2C->DR = (uint8_t)i2c_buffer[i2c_buffer_index++];
 
                 /* Decrement number of bytes */
                 i2c_bytes--;
             }
             if (i2c_bytes == 0)
             {
-                I2C->ITR &= ~I2C_IT_BUF;
+				I2C->ITR &= ~I2C_IT_BUF;
             }
         break;
 
@@ -82,7 +80,7 @@ void i2c_isr(void)
 
             if (i2c_bytes == 0)
             {
-                I2C->ITR &= ~I2C_IT_BUF;
+				I2C->ITR &= ~I2C_IT_BUF;
             }
         break;
 
@@ -90,8 +88,7 @@ void i2c_isr(void)
         case I2C_EVENT_MASTER_BYTE_TRANSMITTED:
             /* Send STOP condition */
             I2C->CR2 |= I2C_CR2_STOP;
-
-            I2C->ITR &= ~I2C_IT_EVT;
+            I2C->ITR &= (uint8_t)(~(uint8_t)I2C_IT_EVT);
         break;
 
         default:
@@ -104,6 +101,9 @@ static int ssd1306_data_block(uint8_t *dat, uint16_t len, uint8_t is_data)
     uint8_t i;
     uint8_t msg;
     uint32_t timeout = g_timer_tick;
+
+    if (!initialized)
+        return -1;
 
     if (is_data != 0)
       msg = 0x40;
@@ -120,7 +120,7 @@ static int ssd1306_data_block(uint8_t *dat, uint16_t len, uint8_t is_data)
     }
 
     /* Enable Buffer and Event Interrupt*/
-    I2C->ITR |= I2C_IT_EVT | I2C_IT_BUF;
+	I2C->ITR |= (I2C_IT_EVT | I2C_IT_BUF);
 
     /* Send START condition */
     I2C->CR2 |= I2C_CR2_START;
@@ -128,32 +128,26 @@ static int ssd1306_data_block(uint8_t *dat, uint16_t len, uint8_t is_data)
     // Wait for the transfer to complete.
     while (i2c_bytes)
     {
-        if (timeout + 50 < g_timer_tick)
-            break;
+        if (timeout + 10 < g_timer_tick)
+            return 1;
     }
-    while ((I2C->SR3 & (I2C_FLAG_BUSBUSY & 0xff)) != 0)
+    while ((I2C->SR3 & 0x02) != 0)
     {
-        if (timeout + 50 < g_timer_tick)
-            break;
+        if (timeout + 10 < g_timer_tick)
+            return 1;
     }
 
-    if (timeout + 50 < g_timer_tick)
-        return 1;
     return 0;
 }
 
 static int ssd1306_command(uint8_t cmd)
 {
-    if (initialized)
-        return ssd1306_data_block(&cmd, 1, 0);
-    return -1;
+    return ssd1306_data_block(&cmd, 1, 0);
 }
 
 static int ssd1306_data(uint8_t *dat, uint16_t len)
 {
-    if (initialized)
-        return ssd1306_data_block(dat, len, 1);
-    return -1;
+    return ssd1306_data_block(dat, len, 1);
 }
 
 int lcd_init(void)
@@ -162,13 +156,15 @@ int lcd_init(void)
     int ret;
 
     /* I2C Initialize */
+    /* Set input freq and disable peripheral */
+	I2C->FREQR = 16;
+    I2C->CR1 &= (uint8_t)(~I2C_CR1_PE);
 
-    /* Set input freq and disable */
-    I2C->FREQR = 16;
-    I2C->CR1 &= ~I2C_CR1_PE;
+	I2C->CCRH &= (uint8_t)(~(I2C_CCRH_FS | I2C_CCRH_DUTY | I2C_CCRH_CCR));
+	I2C->CCRL &= (uint8_t)(~I2C_CCRL_CCR);
 
     /* Set rise time */
-    I2C->TRISER = 6;
+    I2C->TRISER = 5;
 
     /* Configure divisor */
     I2C->CCRL = 13;
@@ -180,7 +176,7 @@ int lcd_init(void)
     /* Enable the acknowledgement */
     I2C->CR2 |= I2C_CR2_ACK;
     /* Configure (N)ACK on current byte */
-    I2C->CR2 &= ~I2C_CR2_POS;
+    I2C->CR2 &= (uint8_t)(~I2C_CR2_POS);
 
     /* Own address */
     I2C->OARL = 0xA0;
@@ -189,7 +185,7 @@ int lcd_init(void)
     // 128x64 OLED "Crius"
     initialized = TRUE;
 
-    GPIO_WriteLow(GPIOD, GPIO_PIN_0);
+	GPIO_WriteLow(GPIOD, GPIO_PIN_0);
 
     // Wait up to 1.5s for the LCD to respond
     for (tries = 0; tries < 15; tries++)
@@ -350,5 +346,3 @@ void lcd_set_cusor(uint8_t x, uint8_t y)
     ssd1306_command(SSD1306_CMD_SET_HIGH_COLUMN | ((x >> 4) & 0x0f)); // hi col
     ssd1306_command(SSD1306_CMD_SET_PAGE_START  | (y / 8)); // row
 }
-
-#endif // ENABLE_LCD

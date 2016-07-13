@@ -5,7 +5,7 @@
  */
 void GPIO_Output(GPIO_TypeDef* GPIOx, GPIO_Pin_TypeDef GPIO_Pin, uint8_t state)
 {
-    GPIOx->CR2 &= ~GPIO_Pin;
+	GPIOx->CR2 &= ~(GPIO_Pin);
     GPIOx->CR1 |= GPIO_Pin;
 
     if (state)
@@ -14,7 +14,7 @@ void GPIO_Output(GPIO_TypeDef* GPIOx, GPIO_Pin_TypeDef GPIO_Pin, uint8_t state)
     }
     else
     {
-        GPIOx->ODR &= ~GPIO_Pin;
+		GPIOx->ODR &= (uint8_t)(~(GPIO_Pin));
     }
 
     // Set Output mode
@@ -26,9 +26,9 @@ void GPIO_Output(GPIO_TypeDef* GPIOx, GPIO_Pin_TypeDef GPIO_Pin, uint8_t state)
  */
 void GPIO_Input(GPIO_TypeDef* GPIOx, GPIO_Pin_TypeDef GPIO_Pin)
 {
-    GPIOx->CR2 &= ~GPIO_Pin;
-    GPIOx->DDR &= ~GPIO_Pin;
-    GPIOx->CR1 &= ~GPIO_Pin;
+	GPIOx->CR2 &= ~(GPIO_Pin);
+    GPIOx->DDR &= ~(GPIO_Pin);
+    GPIOx->CR1 &= ~(GPIO_Pin);
 }
 
 /*

@@ -5,7 +5,7 @@
 #define MUX_VALUES      (6)     // Number of values to read from Analogue Mux.
 
 #define MAX_CELL_V      (4250)  // Charge Abort voltage
-#define MAX_CELL_V_CHG  (4170)  // Charge Termination voltage
+#define MAX_CELL_V_CHG  (3950)  // Charge Termination voltage
 #define MIN_CELL_V      (2900)  // Minimum voltage to register a cell as usable
 #define CELL_PRESENT_V  (1500)  // Value to register a cell as present
 #define PACK_PRESENT_V  (2000)  // Value above which to register the main connector present.
@@ -17,13 +17,12 @@
 
 #define BALANCE_THRESHOLD       (5)         // Threshold in mV between cells before balancing.
 
-#define BATTERY_MEASURE_TIME    (30000)     // Time to measure the battery voltage increase over.
-#define BATTERY_MEASURE_DELAY   (10000)     // Time to allow battery to settle before measurement.
+#define BATTERY_MEASURE_TIME    (40000)     // Time to measure the battery voltage increase over.
+#define BATTERY_MEASURE_DELAY   (14000)     // Time to allow battery to settle before measurement.
 #define BATTERY_CHECK_PERIOD    (120000)    // How often to stop balancing and check the capacity.
 
 #define CHARGE_TIMEOUT          (5400000)   // How long to charge before aborting.
 
-#define ENABLE_LCD                          // Enable I2C LCD output
 #define ENABLE_EXTRA_LCD_INFO               // Extra LCD output (may exceed the flash limit).
 
 // Force a specific charge current and don't measure the pack (debugging).
