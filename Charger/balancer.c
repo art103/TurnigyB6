@@ -74,6 +74,7 @@ void balance_pack(void)
 
     call_count++;
 
+	// Only balance after 5s measuring and during charging
     if (call_count == 5 && state == STATE_CHARGING)
     {
         // Cells have had 5s to settle, check them again.

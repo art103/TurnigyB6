@@ -161,7 +161,7 @@ void adc_sweep(void)
 			case 4:
 			case 5:
 				// Apply per-channel calibration values
-				tmp = (uint32_t)adc_values[adc_input] * (uint32_t)balance_cal[adc_input] / 100;
+				tmp = (uint32_t)adc_values[adc_input] * (uint32_t)calibration[adc_input] / 100;
 
 				// Only report cells that are above our detection threshold
 				if (tmp < CELL_PRESENT_V)
@@ -175,29 +175,31 @@ void adc_sweep(void)
 			// Battery Current
 			case MUX_VALUES:
                 tmp = adc_values[MUX_VALUES];
-                battery_current = (tmp * 10000) / 1225;
-                pwm_curr_avg += battery_current;
-                pwm_curr_count++;
+                tmp *= calibration[MUX_VALUES];
+                pwm_curr_avg += tmp / 100;
+                batt_curr_avg += tmp / 100;
 			break;
 
 			// Battery Voltage
 			case MUX_VALUES + 1:
                 tmp = adc_values[MUX_VALUES + 1];
-                batt_vol_avg += tmp * 523 * 50 / 1024;
+                tmp *= calibration[MUX_VALUES + 1];
+                batt_vol_avg += tmp / 1000;
 			break;
 
 			// Input Voltage
 			case MUX_VALUES + 2:
                 tmp = adc_values[MUX_VALUES + 2];
-                tmp *= 700;
-                tmp *= 50;
-                input_vol_avg += tmp /= 1024;
-                
-                average_count++;
+                tmp *= calibration[MUX_VALUES + 2];
+                input_vol_avg += tmp / 100;
 			break;
 
 			default:
 			break;
 		}
 	}
+	
+	// Increment average counters
+	pwm_curr_count++;
+	average_count++;
 }

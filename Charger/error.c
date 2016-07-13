@@ -26,17 +26,13 @@ void error(uint8_t error_code)
 		delay_ms(100);
 	}
 
-    if (error_code != ERROR_DONE)
+    if (error_code == ERROR_DONE)
     {
-        state = STATE_ERROR;
         leds_set(0x3F, 0x00, 0x3F);
     }
-
-	//while (1)
+	else
 	{
-		//adc_sweep();
-		//update_lcd_info();
-
+        state = STATE_ERROR;
         for (i=0; i<6; ++i)
 		{
 			// Set Red and Green alternating pattern

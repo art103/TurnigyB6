@@ -11,7 +11,7 @@
 #include "ssd1306.h"
 
 // ToDo: Move this to EEPROM.
-const uint16_t balance_cal[NUM_CHANNELS] = {968, 971, 975, 975, 975, 975};
+const uint16_t calibration[MUX_VALUES + 3] = {968, 971, 975, 975, 975, 975, 816, 2550, 3418};
 
 // Global 1ms system timer tick
 volatile uint32_t g_timer_tick = 0;
@@ -20,8 +20,6 @@ volatile uint32_t g_timer_tick = 0;
 uint16_t input_voltage;
 uint16_t battery_voltage;
 uint16_t battery_current;
-uint16_t cell_max;
-uint16_t cell_min;
 
 // Calculated from ADC channels every 100ms
 uint8_t num_cells;
@@ -32,16 +30,20 @@ uint16_t pwm_curr_count;
 
 // Slow average (1s)
 uint16_t average_count;
+uint32_t batt_curr_avg;
 uint32_t batt_vol_avg;
 uint32_t input_vol_avg;
 uint32_t balance_avg[NUM_CHANNELS];
 
+uint16_t cell_max;
+uint16_t cell_min;
 
-uint16_t battery_capacity; // mAh calculated battery capacity.
+// Calculated battery capacity.
+uint16_t battery_capacity; 
 
 // Charger logic state
 State state = STATE_CHECKING;
-uint8_t timeout = 0;
+uint32_t timeout = 0;
 uint32_t charge_start;
 uint16_t pack_start;
 uint8_t balancing; // Bitmask of channels being balanced.
@@ -187,16 +189,31 @@ void monitor_pack(void)
 {
 	uint8_t i;
 
-	// We have detected cells. Check if it is safe to charge.
-	if (num_cells >= 2)
+	// Check to see if we have at least 2 cells.
+	if (num_cells < 2)
 	{
-		uint8_t ok = 1;	// Assume everything is ok.
+#ifdef ENABLE_EXTRA_LCD_INFO
+		lcd_set_cusor(18, 8);
+		lcd_write_string("None ", 1);
+#endif // ENABLE_EXTRA_LCD_INFO
 
+		// Was the balance port removed?
+		if (state >= STATE_MEASURING)
+		{
+			error(ERROR_LOW_VOLTAGE_CELL);
+		}
+	}
+	// We have detected cells. Check if it is safe to charge.
+	else
+	{
+		uint8_t ok = 1;	// Assume everything is ok for now.
+
+		// Display the number of detected cells.
 		lcd_set_cusor(18, 8);
 		lcd_write_digits(num_cells, 1);
 		lcd_write_string("S   ", 1);
 
-		// Iterate through the cells, checking them.
+		// Iterate through the balance connector checking the cells.
 		for (i=0; i<num_cells; ++i)
 		{
 			// Check to see if we have a dead / missing cell
@@ -210,142 +227,156 @@ void monitor_pack(void)
 					error(ERROR_LOW_VOLTAGE_CELL);
 				}
 			}
+
+			// Check to see if we have an over voltage cell
+			if (adc_values[i] >= MAX_CELL_V)
+			{
+				ok = 0;
+				if (timeout++ > 3) // 3s timeout
+				{
+					error(ERROR_HIGH_VOLTAGE_CELL);
+				}
+			}
 		}
 
+		// Balance connector looks ok, now check the pack.
 		if (ok)
 		{
 			// Check to see that our battery voltage is within the
 			// correct range for the detected cells.
-			if (battery_voltage > MIN_CELL_V * num_cells)
+			if ((battery_voltage > MAX_CELL_V * num_cells) ||
+				(battery_voltage < MIN_CELL_V * num_cells))
 			{
-				if (battery_voltage > MAX_CELL_V * num_cells)
+				// The battery voltage doesn't match the cell count.
+				ok = 0;
+				if (timeout++ > 3)   // 3s timeout
 				{
-					// The battery voltage doesn't match the cell count.
-					ok = 0;
-					if (timeout++ > 3)   // 3s timeout
-					{
-						error(ERROR_PACK_VOLTAGE);
-					}
-				}
-				else
-				{
-					switch (state)
-					{
-						case STATE_CHECKING:
-                            if (timeout++ > 3)  // 3s timeout
-                            {
-                                // This seems to check out. Show the cell count
-                                leds_set(0, (1 << num_cells) - 1, 0x3F);
-
-                                // Start charge at measuring current.
-                                battery_capacity = INITIAL_CHARGE_CURRENT;
-                                pwm_set_current(INITIAL_CHARGE_CURRENT);
-
-                                // Delay starting the next measurement cycle whilst the current ramps up.
-                                charge_start = g_timer_tick + BATTERY_MEASURE_DELAY;
-                                pack_start = battery_voltage;
-
-                                state = STATE_MEASURING;
-                            }
-						break;
-
-						case STATE_MEASURING:
-							// Let the battery settle to the new charge current.
-							if (charge_start > g_timer_tick)
-							{
-								if (battery_voltage < pack_start)
-								{
-									pack_start = battery_voltage;
-								}
-                            }
-
-							// Keep an eye on the pack voltage and measure a 50mV/cell increase.
-							// From this, calculate the pack mAh.
-							if (charge_start + BATTERY_MEASURE_TIME < g_timer_tick)
-							{
-#if 0
-                                state = STATE_CHARGING;
-                                leds_set((1 << num_cells) - 1, 0, 0x3F);
-                                battery_capacity = 1400;
-                                pwm_set_current(battery_capacity);
-#else
-								uint32_t calc;
-								uint16_t delta = 0;
-
-								if (battery_voltage > pack_start)
-								{
-									delta = battery_voltage - pack_start;
-								}
-
-								delta += 10;
-
-
-                                if (delta > 0)
-                                {
-                                    calc = (4200 - 3200);
-                                    calc *= 3600;
-                                    calc *= battery_current;
-                                    calc /= g_timer_tick - charge_start;
-                                    calc /= delta;
-                                    battery_capacity = calc;
-                                }
-
-								//if (battery_capacity > 2 * battery_current)
-								{
-									charge_start = g_timer_tick;
-									pack_start = battery_voltage;
-
-									// Set charge rate to 1C
-									pwm_set_current(battery_capacity * CHARGE_RATE);
-
-									// Delay starting the next measurement cycle whilst the current ramps up.
-									charge_start = g_timer_tick + BATTERY_MEASURE_DELAY;
-
-									state = STATE_CHARGING;
-									leds_set((1 << num_cells) - 1, 0, 0x3F);
-								}
-#endif
-							}
-						break;
-
-                        case STATE_CHARGING:
-                            if (cell_max >= 3950 /*MAX_CELL_V_CHG*/)
-                            {
-                                pwm_set_current(target_current - 100);
-                            }
-                            else if (battery_current < battery_capacity)
-                            {
-                                pwm_set_current(target_current + 10);
-                            }
-
-                            if (target_current <= battery_capacity / 10)
-                            {
-                                state = STATE_DONE;
-                                error(ERROR_DONE);
-							}
-                        break;
-
-						case STATE_DONE:
-                            // Nothing to see here.
-                            state = STATE_DONE;
-						break;
-					}
+					error(ERROR_PACK_VOLTAGE);
 				}
 			}
-		}
-	} // num_cells > 2
-	else
-	{
-#ifdef ENABLE_EXTRA_LCD_INFO
-		lcd_set_cusor(18, 8);
-		lcd_write_string("None ", 1);
-#endif // ENABLE_EXTRA_LCD_INFO
+			else
+			{
+				switch (state)
+				{
+					case STATE_CHECKING:
+						if (timeout++ > 3)  // 3s timeout
+						{
+							// Start charge at measuring current.
+							battery_capacity = INITIAL_CHARGE_CURRENT;
+							pwm_set_current(INITIAL_CHARGE_CURRENT);
 
-		if (state >= STATE_MEASURING)
-		{
-			error(ERROR_LOW_VOLTAGE_CELL);
-		}
-	}
+							// Delay starting the next measurement cycle whilst the current ramps up.
+							charge_start = g_timer_tick + BATTERY_MEASURE_DELAY;
+							pack_start = battery_voltage;
+
+							state = STATE_MEASURING;
+							timeout = 0;
+						}
+					break;
+
+					case STATE_MEASURING:
+						// Set the Cell count LEDs to Red.
+						leds_set(0, (1 << num_cells) - 1, 0x3F);
+						
+						// Let the battery settle to the new charge current.
+						if (charge_start > g_timer_tick)
+						{
+							if (battery_voltage < pack_start)
+							{
+								pack_start = battery_voltage;
+							}
+						}
+
+						// Keep an eye on the pack voltage and measure the cell increase.
+						// From this, calculate the pack mAh.
+						if (charge_start + BATTERY_MEASURE_TIME < g_timer_tick)
+						{
+#if 0
+							state = STATE_CHARGING;
+							leds_set((1 << num_cells) - 1, 0, 0x3F);
+							battery_capacity = 1400;
+							pwm_set_current(battery_capacity);
+#else
+							uint32_t calc;
+							uint16_t delta = 0;
+
+							if (battery_voltage > pack_start)
+							{
+								delta = battery_voltage - pack_start;
+							}
+
+							delta += 10;
+
+
+							if (delta > 0)
+							{
+								calc = (4200 - 3200);
+								calc *= 3600;
+								calc *= battery_current;
+								calc /= g_timer_tick - charge_start;
+								calc /= delta;
+								battery_capacity = calc;
+							}
+
+							//if (battery_capacity > 2 * battery_current)
+							{
+								charge_start = g_timer_tick;
+								pack_start = battery_voltage;
+
+								// Set charge rate to 1C
+								pwm_set_current(battery_capacity * CHARGE_RATE);
+
+								// Delay starting the next measurement cycle whilst the current ramps up.
+								charge_start = g_timer_tick + BATTERY_MEASURE_DELAY;
+
+								state = STATE_CHARGING;
+							}
+#endif
+						}
+					break;
+
+					case STATE_CHARGING:
+						// Set the Cell count LEDs to Red.
+						leds_set((1 << num_cells) - 1, 0, 0x3F);
+
+						if (cell_max >= 3950 /*MAX_CELL_V_CHG*/)
+						{
+							pwm_set_current(target_current - 100);
+						}
+						else if (battery_current < battery_capacity)
+						{
+							pwm_set_current(target_current + 10);
+						}
+
+						if (target_current <= battery_capacity / 10)
+						{
+							state = STATE_DONE;
+							error(ERROR_DONE);
+						}
+						
+						if (g_timer_tick > CHARGE_TIMEOUT)
+						{
+							error(ERROR_TIMEOUT);
+						}
+						
+						// Re-measure pack regularly.
+						if (timeout++ > BATTERY_CHECK_PERIOD)
+						{
+							balancer_off();
+							state = STATE_MEASURING;
+							charge_start = g_timer_tick;
+							timeout = 0;
+						}
+					break;
+
+					case STATE_DONE:
+						// Nothing to see here.
+						state = STATE_DONE;
+					break;
+				} // switch(state)
+			} // Pack voltage range ok
+		} // ok
+	} // num_cells > 2
 }
 
 void monitor_input(void)
@@ -423,7 +454,7 @@ int main(void)
 					num_cells++;
 				}
 			}
-			
+
 			if (state == STATE_CHECKING)
 			{
 				// Green Scanning sequence
@@ -453,6 +484,10 @@ int main(void)
                     cell_min = avg;
                 balance_avg[i] = avg;
             }
+
+			// Calculate the current average (for Display use)
+			battery_current = batt_curr_avg / average_count;
+			batt_curr_avg = 0;
 
 			// Calculate the battery voltage average
             battery_voltage = batt_vol_avg / average_count;
