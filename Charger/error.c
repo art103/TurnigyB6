@@ -17,15 +17,12 @@ void error(uint8_t error_code)
 	balancer_off();
 
 	// Beep the error code out
-	BEEP->CSR &= ~BEEP_CSR_BEEPSEL;
-	BEEP->CSR |= BEEP_FREQUENCY_2KHZ;
-
 	for (i=0; i<error_code; ++i)
 	{
 		// Buzzer
-		BEEP->CSR |= BEEP_CSR_BEEPEN;
+		buzzer_on(BEEP_FREQUENCY_2KHZ);
 		delay_ms(100);
-		BEEP->CSR &= ~BEEP_CSR_BEEPEN;
+		buzzer_off();
 		delay_ms(100);
 	}
 

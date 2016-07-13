@@ -174,8 +174,6 @@ void adc_sweep(void)
 
 			// Battery Current
 			case MUX_VALUES:
-                balance_avg_count++;
-
                 tmp = adc_values[MUX_VALUES];
                 battery_current = (tmp * 10000) / 1225;
                 pwm_curr_avg += battery_current;
@@ -186,7 +184,6 @@ void adc_sweep(void)
 			case MUX_VALUES + 1:
                 tmp = adc_values[MUX_VALUES + 1];
                 batt_vol_avg += tmp * 523 * 50 / 1024;
-                batt_vol_cnt++;
 			break;
 
 			// Input Voltage
@@ -194,7 +191,9 @@ void adc_sweep(void)
                 tmp = adc_values[MUX_VALUES + 2];
                 tmp *= 700;
                 tmp *= 50;
-                input_voltage = tmp /= 1024;
+                input_vol_avg += tmp /= 1024;
+                
+                average_count++;
 			break;
 
 			default:

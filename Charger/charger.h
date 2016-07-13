@@ -4,19 +4,22 @@
 #define NUM_CHANNELS 	(6)		// Number of balance / LED channels.
 #define MUX_VALUES		(6)   	// Number of values to read from Analogue Mux.
 
-#define MAX_CELL_V		(4200)	// This is the termination voltage
+#define MAX_CELL_V		(4250)	// This is the abort voltage
+#define MAX_CELL_V_CHG	(4170)	// This is the termination voltage
 #define MIN_CELL_V		(2900)	// This is the minimum voltage to register a cell as usable
 #define CELL_PRESENT_V	(1500)	// This is the value to register a cell as present
 #define PACK_PRESENT_V	(2000)	// Value above which to register the main connector present.
 
 #define INITIAL_CHARGE_CURRENT	(500) // This is the charge rate in mA before calculating the battery capacity.
+#define MAX_CHARGE_CURRENT		(5000)
+#define MAX_CHARGE_POWER		(50 * 1000000)
 #define CHARGE_RATE		(1)		// This is the charge rate in C after calculating the battery capacity.
 
 #define BALANCE_CHECK		(5000)
 #define BALANCE_THRESHOLD	(5)	// Threshold in mV from the minimum cell value before balancing.
 
-#define BATTERY_MEASURE_TIME	(3000)	// Number of ms to measure the battery voltage increase over.
-#define BATTERY_MEASURE_DELAY	(3000)
+#define BATTERY_MEASURE_TIME	(30000)	// Number of ms to measure the battery voltage increase over.
+#define BATTERY_MEASURE_DELAY	(10000)
 
 #define ENABLE_EXTRA_LCD_INFO	// Nice output, but may blow the flash limit.
 
@@ -40,12 +43,15 @@ extern volatile uint16_t adc_values[MUX_VALUES + 3];   // Values read from ADC
 extern uint16_t input_voltage;
 extern uint16_t battery_voltage;
 extern uint16_t battery_current;
+
 extern uint32_t pwm_curr_avg;
 extern uint16_t pwm_curr_count;
+
+extern uint16_t average_count;
+extern uint32_t input_vol_avg;
 extern uint32_t batt_vol_avg;
-extern uint16_t batt_vol_cnt;
-extern uint16_t balance_avg_count;
 extern uint32_t balance_avg[NUM_CHANNELS];
+
 extern uint8_t balancing;
 extern uint8_t num_cells;
 extern uint16_t cell_min;
@@ -53,7 +59,7 @@ extern uint16_t cell_max;
 extern uint16_t battery_capacity;
 extern uint16_t target_current;
 
-extern uint16_t balance_cal[NUM_CHANNELS];
+extern const uint16_t balance_cal[NUM_CHANNELS];
 
 
 

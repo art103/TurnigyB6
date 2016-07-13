@@ -104,67 +104,97 @@ void pwm_set_current(uint16_t current)
 {
 	pwm_enable(TRUE);
 
-    if (current > battery_capacity)
-        current = battery_capacity;
-
+    if (current > battery_capacity * CHARGE_RATE)
+        current = battery_capacity * CHARGE_RATE;
+    if (current > MAX_CHARGE_CURRENT)
+		current = MAX_CHARGE_CURRENT;
+		
 	target_current = current;
-	if (battery_voltage > input_voltage)
-	{
-		buck_val = PWM_TIMER_BASE;
-	}
-	else
-	{
-		buck_val = PWM_TIMER_BASE * battery_voltage / input_voltage;
-	}
 
 	pwm_run_pid();
 }
 
 /*
  * Check the measured current and adjust
- * the PWM accordingly.
+ * the PWM accordingly. This should be a PI, maybe D, 
+ * but is P only due to flash space.
  */
 void pwm_run_pid(void)
 {
-	if (target_current > battery_current + (5 * (uint32_t)target_current / 100))	// Stop oscillations.
+	uint16_t delta;
+	uint32_t calc;
+	
+	// Make sure we stay within the 50W power limit.
+	calc = target_current * battery_voltage;
+	if (calc > MAX_CHARGE_POWER)
 	{
+		calc = MAX_CHARGE_POWER / battery_voltage;
+		target_current = calc;
+	}
+
+	// Going up.
+	if (target_current > battery_current)// + (2 * target_current / 100))	// Stop oscillations.
+	{
+		delta = target_current - battery_current;
+		delta /= 10;
+		if (delta == 0)
+			delta = 1;
+		
 		if (buck_val == PWM_TIMER_BASE)
 		{
-			boost_val++;
+			boost_val += delta;
 
 			// Limit the boost value to avoid short circuit.
-			if (boost_val > (PWM_TIMER_BASE / 2))
+			if (boost_val > (PWM_TIMER_BASE / 3))
 			{
-				boost_val = (PWM_TIMER_BASE / 2);
+				boost_val = (PWM_TIMER_BASE / 3);
 			}
 		}
 		else
 		{
-			buck_val++;
+			buck_val += delta;
 			if (buck_val > PWM_TIMER_BASE)
 			{
 				buck_val = PWM_TIMER_BASE;
 			}
 		}
 	}
+	// Going down.
 	else if (target_current < battery_current)
 	{
+		delta = battery_current - target_current;
+		delta /= 10;
+		if (delta == 0)
+			delta = 1;
+		
 		if (buck_val == PWM_TIMER_BASE)
 		{
-			if (boost_val > 0)
+			if (boost_val >= delta)
 			{
-				boost_val--;
+				boost_val -= delta;
 			}
 			else
 			{
-				buck_val--;
+				boost_val = 0;
+				if (buck_val >= delta)
+				{
+					buck_val -= delta;
+				}
+				else
+				{
+					buck_val = 0;
+				}
 			}
 		}
 		else
 		{
-			if (buck_val > 0)
+			if (buck_val >= delta)
 			{
-				buck_val--;
+				buck_val -= delta;
+			}
+			else
+			{
+				buck_val = 0;
 			}
 		}
 	}
@@ -176,19 +206,16 @@ void buzzer_init(void)
 {
     BEEP->CSR &= ~BEEP_CSR_BEEPDIV;
     BEEP->CSR |= BEEP_CALIBRATION_DEFAULT;
+}
 
-    BEEP->CSR &= ~BEEP_CSR_BEEPSEL;
-    BEEP->CSR |= BEEP_FREQUENCY_1KHZ;
-
+void buzzer_on(uint8_t freq)
+{
+	BEEP->CSR &= ~BEEP_CSR_BEEPSEL;
+	BEEP->CSR |= freq;
 	BEEP->CSR |= BEEP_CSR_BEEPEN;
-	delay_ms(150);
-    BEEP->CSR &= ~BEEP_CSR_BEEPSEL;
-    BEEP->CSR |= BEEP_FREQUENCY_2KHZ;
+}
 
-	delay_ms(100);
+void buzzer_off(void)
+{
     BEEP->CSR &= ~BEEP_CSR_BEEPSEL;
-    BEEP->CSR |= BEEP_FREQUENCY_4KHZ;
-	delay_ms(50);
-
-	BEEP->CSR &= ~BEEP_CSR_BEEPEN;
 }

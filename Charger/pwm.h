@@ -27,5 +27,7 @@ void pwm_set_current(uint16_t current);
 void pwm_run_pid(void);
 
 void buzzer_init(void);
+void buzzer_on(uint8_t freq);
+void buzzer_off(void);
 
 #endif // _PWM_H_
