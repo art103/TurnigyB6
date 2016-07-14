@@ -1,11 +1,10 @@
 # Custom Turnigy B6 Compact Firmware
 
 ## What?
-This is a repalcement firmware for the Turnigy B6 Compact charger:
-http://goo.gl/uX2E8J
+This is a repalcement firmware for the [Turnigy B6 Compact charger](http://goo.gl/uX2E8J).
 
-It supports an I2C OLED display based on the ssd1306 chip like this one: 
-http://goo.gl/ApJXRa
+
+It supports an I2C OLED display based on the ssd1306 chip like [this one](http://goo.gl/ApJXRa).
 
 ## Why?
 I did not want 2C charging and I wanted an LCD output. 
