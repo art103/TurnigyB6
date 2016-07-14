@@ -10,44 +10,48 @@
 #include "ssd1306.h"
 
 // ToDo: Move this to EEPROM.
-const uint16_t calibration[MUX_VALUES + 3] = {968, 971, 975, 992, 975, 975, 816, 2550, 3418};
+const uint16_t calibration[MUX_VALUES + 3] = {968, 971, 975, 992, 995, 995, 816, 2550, 3418};
 
 // Global 1ms system timer tick
 volatile uint32_t g_timer_tick = 0;
 
 // Calculated from averages every 1s.
-uint16_t input_voltage;             // Input voltage (averaged)
-uint16_t battery_voltage;           // Battery voltage (averaged)
-uint16_t battery_current;           // Battery current (averaged)
+uint16_t input_voltage;             // Input voltage (averaged).
+uint16_t battery_voltage;           // Battery voltage (averaged).
+uint16_t battery_current;           // Battery current (averaged).
 
 // Calculated every 100ms
 uint8_t num_cells;                  // Number of cells on the balance port.
 
 // Fast average (100ms)
-uint32_t pwm_curr_avg;              // Battery current (100ms average)
-uint16_t pwm_curr_count;            // Number of average counts
+uint32_t pwm_curr_avg;              // Battery current (100ms average).
+uint16_t pwm_curr_count;            // Number of average counts.
 
 // Slow average (1s)
 uint16_t average_count;             // Number of average counts.
-uint32_t batt_curr_avg;             // Battery current (avg total)
-uint32_t batt_vol_avg;              // Battery voltage (avg total)
-uint32_t input_vol_avg;             // Input voltage (avg total)
+uint32_t batt_curr_avg;             // Battery current (avg total).
+uint32_t batt_vol_avg;              // Battery voltage (avg total).
+uint32_t input_vol_avg;             // Input voltage (avg total).
 uint32_t balance_avg[NUM_CHANNELS]; // Balance port values (averaged).
 
-uint16_t cell_max;                  // Maximum cell voltage (balance port)
-uint16_t cell_min;                  // Minimum cell voltage (balance port)
+uint16_t cell_max;                  // Maximum cell voltage (balance port).
+uint16_t cell_min;                  // Minimum cell voltage (balance port).
 
-uint16_t battery_capacity;          // Calculated battery capacity
+uint16_t battery_capacity;          // Calculated battery capacity.
 
 // Charger logic state
-State state = STATE_CHECKING;       // Charger logic state
+State state = STATE_CHECKING;       // Charger logic state.
 uint32_t timeout = 0;               // Timeout used during pack monitoring.
 uint32_t charge_start;              // Time that charge measurement was started.
-uint32_t pack_start_avg;            // Starting voltage of pack during measurement.
-uint16_t pack_start_cnt;
 uint8_t balancing;                  // Bitmask of channels being balanced.
 
-
+// Very high accuracy averages for capacity calcualtion
+uint32_t pack_start_avg;            // Starting voltage of pack during measurement.
+uint16_t pack_start_cnt;
+uint32_t pack_end_avg;              // Ending  voltage of pack during measurement.
+uint16_t pack_end_cnt;
+uint16_t pack_start;
+uint16_t pack_end;
 
 /*
  * System timer ISR
@@ -212,6 +216,7 @@ void update_lcd_info(void)
 void monitor_and_charge_pack(void)
 {
     uint8_t i;
+    uint32_t calc;
 
     // Check to see if we have at least 2 cells.
     if (num_cells < 2)
@@ -253,7 +258,7 @@ void monitor_and_charge_pack(void)
             }
 
             // Check to see if we have an over voltage cell
-            if (adc_values[i] >= MAX_CELL_V)
+            if (adc_values[i] > MAX_CELL_V)
             {
                 ok = 0;
                 if (timeout++ > 3) // 3s timeout
@@ -269,7 +274,7 @@ void monitor_and_charge_pack(void)
             // Check to see that our battery voltage is within the
             // correct range for the detected cells.
             if ((battery_voltage > MAX_CELL_V * num_cells)
-                //|| ((battery_voltage < MIN_CELL_V * num_cells) && state > STATE_CHECKING)
+                //|| ((battery_voltage < MIN_CELL_V * num_cells) && state > STATE_CHECKING) // Checked below before charging.
                 )
             {
                 // The battery voltage doesn't match the cell count.
@@ -284,95 +289,109 @@ void monitor_and_charge_pack(void)
                 switch (state)
                 {
                     case STATE_CHECKING:
-						leds_set(0, 0x3F, 0x3F);
                         if (timeout++ > 3)  // 3s timeout
                         {
                             // Start charge at measuring current.
                             battery_capacity = INITIAL_CHARGE_CURRENT;
                             pwm_set_current(INITIAL_CHARGE_CURRENT);
 
-                            // Delay starting the next measurement cycle whilst the current ramps up.
-                            charge_start = g_timer_tick + BATTERY_MEASURE_DELAY;
-                            pack_start_avg = 0;
-                            pack_start_cnt = 0;
-
-                            state = STATE_MEASURING;
+                            // Prepare the measurement cycle.
+                            charge_start = g_timer_tick;
                             timeout = 0;
+                            state = STATE_MEASURING;
                         }
                     break;
 
                     case STATE_MEASURING:
+                        // Check to see if we hit our termination voltage.
+                        if (cell_max >= MAX_CELL_V_CHG)
+                        {
+                            state = STATE_DONE;
+                            error(ERROR_DONE);
+                        }
+
                         // Set the Cell count LEDs to Green.
                         leds_set(0, (1 << num_cells) - 1, 0x3F);
 
-                        // Let the battery settle to the new charge current.
-                        if (charge_start > g_timer_tick)
-                        {
-							// Only average the pack voltage for the last half of the settling time.
-							if (charge_start - g_timer_tick < BATTERY_MEASURE_DELAY - 4000)
-							{
-								pack_start_avg += battery_voltage;
-								pack_start_cnt++;
-							}
+                        // See where we are in the cycle
+                        calc = g_timer_tick - charge_start;
 
-                            // Check to see if we hit our termination voltage.
-							if (cell_max >= MAX_CELL_V_CHG)
-							{
-								state = STATE_DONE;
-								error(ERROR_DONE);
-							}
+                        if (calc < 5000)
+                        {
+                            // Let the battery settle to the new charge current.
+                            pack_start_avg = 0;
+                            pack_start_cnt = 0;
                         }
-
-                        // Keep an eye on the pack voltage and measure the cell increase.
-                        // From this, calculate the pack mAh.
-                        if (charge_start + BATTERY_MEASURE_TIME < g_timer_tick)
+                        else if (calc < 10000)
                         {
-                            uint32_t calc;
-                            uint16_t delta = 0;
+                            // Take a 5s average of the voltage
+                            pack_start_avg += battery_voltage;
+                            pack_start_cnt++;
+                        }
+                        else if (calc < BATTERY_MEASURE_TIME - 5000)
+                        {
+                            // Twiddle Thumbs
+                            pack_end_avg = 0;
+                            pack_end_cnt = 0;
+                        }
+                        else if (calc < BATTERY_MEASURE_TIME)
+                        {
+                            // Take a 5s average of the voltage
+                            pack_end_avg += battery_voltage;
+                            pack_end_cnt++;
+                        }
+                        else
+                        {
+                            // Calculate the pack capacity.
 
                             pack_start_avg = pack_start_avg / pack_start_cnt;
+                            pack_end_avg = pack_end_avg / pack_end_cnt;
 
-                            if (battery_voltage > pack_start_avg)
+                            if (pack_end_avg <= pack_start_avg)
                             {
-                                delta = battery_voltage - pack_start_avg;
+                                // Start again (this result implies a > 40Ah pack!).
+                                charge_start = g_timer_tick;
                             }
-
-                            //delta += 5;
-
-                            if (delta > 0)
+                            else
                             {
                                 calc = (4200 - 3200);
                                 calc *= 3600;
+                                calc /= g_timer_tick - (charge_start + 15000);
                                 calc *= battery_current;
-                                calc /= g_timer_tick - charge_start;
-                                calc /= delta;
+                                calc /= pack_end_avg - pack_start_avg;
                                 battery_capacity = calc;
+
+                                charge_start = g_timer_tick;
+
+                                // Set charge rate to 1C
+                                //pwm_set_current(battery_capacity * CHARGE_RATE);
+                                pwm_set_current(1400);
+
+                                state = STATE_CHARGING;
                             }
-
-                            charge_start = g_timer_tick;
-
-                            // Set charge rate to 1C
-                            //pwm_set_current(battery_capacity * CHARGE_RATE);
-                            pwm_set_current(1400);
-
-                            state = STATE_CHARGING;
                         }
                     break;
 
                     case STATE_CHARGING:
                         // Set the Cell count LEDs to Red.
-						leds_set((1 << num_cells) - 1, 0, 0x3F & ~balancing);
+                        leds_set((1 << num_cells) - 1, 0, 0x3F);
 
-                        if (cell_max > MAX_CELL_V_CHG + 5)
+                        // Only apply the current reduction when balancing
+                        // is off. (balancing is turned off regularly).
+                        if (balancing == 0)
                         {
-                            pwm_set_current(target_current - 100);
-                        }
-                        else if (battery_current < battery_capacity && (balancing == 0))
-                        {
-                            pwm_set_current(target_current + 10);
+                            if (cell_max > MAX_CELL_V_CHG)
+                            {
+                                pwm_set_current(target_current - 100);
+                            }
+                            else if (battery_current < battery_capacity)
+                            {
+                                pwm_set_current(target_current + 10);
+                            }
                         }
 
-                        if (target_current <= battery_capacity / 10)
+                        // Complete at 0.1C (or 100mA, whichever is higher)
+                        if ((target_current < 100) || (target_current <= battery_capacity / 10))
                         {
                             state = STATE_DONE;
                             error(ERROR_DONE);
@@ -388,10 +407,9 @@ void monitor_and_charge_pack(void)
                         if (timeout++ > BATTERY_CHECK_PERIOD)
                         {
                             balancer_off();
-                            state = STATE_MEASURING;
+                            // Prepare the measurement cycle.
                             charge_start = g_timer_tick;
-                            pack_start_avg = 0;
-                            pack_start_cnt = 0;
+                            state = STATE_MEASURING;
                             timeout = 0;
                         }
                     break;
@@ -402,7 +420,7 @@ void monitor_and_charge_pack(void)
                     break;
                 } // switch(state)
             } // Pack voltage range ok
-        } // ok
+        } // Balance cells ok
     } // num_cells > 2
 }
 
@@ -418,7 +436,7 @@ void monitor_input(void)
     // Make sure we don't discharge the supply pack too far.
     if (state > STATE_CHECKING && (input_voltage < input_cells * 3500 || input_voltage < 10000))
 #else
-	if (state > STATE_CHECKING && input_voltage < 10000)
+    if (state > STATE_CHECKING && input_voltage < 10000)
 #endif
     {
         error(ERROR_INPUT_VOLTAGE);
@@ -441,7 +459,6 @@ int main(void)
     leds_init();
     adc_init();
     balancer_init();
-	GPIO_WriteHigh(GPIOD, GPIO_PIN_0);
 
     // Initialize the LCD
     lcd_init();
@@ -532,11 +549,11 @@ int main(void)
                 uint16_t avg = balance_avg[i] / average_count;
                 if (i < num_cells)
                 {
-					if (avg > cell_max)
-						cell_max = avg;
-					if (avg < cell_min)
-						cell_min = avg;
-				}
+                    if (avg > cell_max)
+                        cell_max = avg;
+                    if (avg < cell_min)
+                        cell_min = avg;
+                }
                 balance_avg[i] = avg;
             }
 
@@ -559,19 +576,19 @@ int main(void)
             monitor_input();
             monitor_and_charge_pack();
             balance_pack();
-            
+
             // Flash the cells that are balancing
             if (state >= STATE_CHARGING)
             {
-				if ((scan++ % 2) == 0)
-				{
-					leds_set(0, 0, balancing);
-				}
-				else if (state == STATE_DONE)
-				{
-					leds_set(0, (1 << num_cells) - 1, 0x3F);
-				}
-			}
+                if ((scan++ % 2) == 0)
+                {
+                    leds_set(0, 0, balancing);
+                }
+                else if (state == STATE_DONE)
+                {
+                    leds_set(0, (1 << num_cells) - 1, 0x3F);
+                }
+            }
         }
     }
 }

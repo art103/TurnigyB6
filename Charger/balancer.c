@@ -77,31 +77,34 @@ void balance_pack(void)
 
     call_count++;
 
-    // Only balance after 5s measuring and during charging
-    if (call_count == 5 && state >= STATE_CHARGING)
-    {
-        // Cells have had 5s to settle, check them again.
-        if ((cell_max - cell_min) > BALANCE_THRESHOLD)
-        {
-            // Work out which cells need reducing.
-            for (i=0; i<NUM_CHANNELS; ++i)
-            {
-                if (balance_avg[i] > (cell_min + BALANCE_THRESHOLD))
-                {
-                    balancing |= (1 << i);
-                    balancer_set(1 << i, 1 << i);
-                }
-            }
-        }
-        else
-        {
-            // All ok, check again in 5s.
-            call_count = 0;
-        }
+    // Only balance during charging or after completion
+    if (state >= STATE_CHARGING)
+	{
+		if (call_count == 2)
+		{
+			// Cells have had time to settle, check them again.
+			if ((cell_max - cell_min) > BALANCE_THRESHOLD)
+			{
+				// Work out which cells need reducing.
+				for (i=0; i<NUM_CHANNELS; ++i)
+				{
+					if (balance_avg[i] > (cell_min + BALANCE_THRESHOLD))
+					{
+						balancing |= (1 << i);
+					}
+				}
+				balancer_set(balancing, 0x3F);
+			}
+			else
+			{
+				// All ok, check again later
+				call_count = 0;
+			}
+		}
     }
-    else if (call_count >= 20)
+    else if (call_count >= 7)
     {
-        // 15s of balancing then let the cells settle for 5s.
+        // let the cells settle
         balancer_off();
         call_count = 0;
     }

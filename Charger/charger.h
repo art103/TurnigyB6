@@ -17,8 +17,7 @@
 
 #define BALANCE_THRESHOLD       (5)         // Threshold in mV between cells before balancing.
 
-#define BATTERY_MEASURE_TIME    (40000)     // Time to measure the battery voltage increase over.
-#define BATTERY_MEASURE_DELAY   (14000)     // Time to allow battery to settle before measurement.
+#define BATTERY_MEASURE_TIME    (60000)     // Time to measure the battery voltage increase over.
 #define BATTERY_CHECK_PERIOD    (120000)    // How often to stop balancing and check the capacity.
 
 #define CHARGE_TIMEOUT          (5400000)   // How long to charge before aborting.
