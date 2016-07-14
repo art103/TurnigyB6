@@ -59,7 +59,6 @@
   * @{
   */
 
-#ifdef BLOATED
 /**
   * @brief  Deinitializes the I2C peripheral registers to their default reset values.
   * @param  None
@@ -77,7 +76,6 @@ void I2C_DeInit(void)
   I2C->CCRH = I2C_CCRH_RESET_VALUE;
   I2C->TRISER = I2C_TRISER_RESET_VALUE;
 }
-#endif
 
 /**
   * @brief  Initializes the I2C according to the specified parameters in standard
@@ -195,8 +193,6 @@ void I2C_Init(uint32_t OutputClockFrequencyHz, uint16_t OwnAddress,
                    (uint8_t)((OwnAddress & (uint16_t)0x0300) >> (uint8_t)7));
 }
 
-#ifdef BLOATED
-
 /**
   * @brief  Enables or disables the I2C peripheral.
   * @param  NewState : Indicate the new I2C peripheral state.
@@ -242,7 +238,6 @@ void I2C_GeneralCallCmd(FunctionalState NewState)
     I2C->CR1 &= (uint8_t)(~I2C_CR1_ENGC);
   }
 }
-#endif
 
 /**
   * @brief  Generates I2C communication START condition.
@@ -292,8 +287,6 @@ void I2C_GenerateSTOP(FunctionalState NewState)
   }
 }
 
-#ifdef BLOATED
-
 /**
   * @brief  Enables or disables I2C software reset.
   * @param  NewState : Specifies the new state of the I2C software reset.
@@ -341,7 +334,6 @@ void I2C_StretchClockCmd(FunctionalState NewState)
     I2C->CR1 |= I2C_CR1_NOSTRETCH;
   }
 }
-#endif
 
 /**
   * @brief  Enable or Disable the I2C acknowledge and position acknowledge feature.
@@ -404,7 +396,6 @@ void I2C_ITConfig(I2C_IT_TypeDef I2C_IT, FunctionalState NewState)
   }
 }
 
-#ifdef BLOATED
 /**
   * @brief  Selects the specified I2C fast mode duty cycle.
   * @param  I2C_DutyCycle : Specifies the duty cycle to apply.
@@ -438,7 +429,6 @@ uint8_t I2C_ReceiveData(void)
   /* Return the data present in the DR register */
   return ((uint8_t)I2C->DR);
 }
-#endif
 
 /**
   * @brief  Transmits the 7-bit address (to select the) slave device.
@@ -470,8 +460,6 @@ void I2C_SendData(uint8_t Data)
   /* Write in the DR register the data to be sent */
   I2C->DR = Data;
 }
-
-#ifdef BLOATED
 
 /**
  * @brief
@@ -622,7 +610,6 @@ ErrorStatus I2C_CheckEvent(I2C_Event_TypeDef I2C_Event)
   /* Return status */
   return status;
 }
-#endif
 
 /**
  *
@@ -736,8 +723,6 @@ FlagStatus I2C_GetFlagStatus(I2C_Flag_TypeDef I2C_Flag)
   /* Return the flag status */
   return bitstatus;
 }
-
-#ifdef BLOATED
 
 /**
   * @brief  Clear flags
@@ -896,7 +881,6 @@ void I2C_ClearITPendingBit(I2C_ITPendingBit_TypeDef I2C_ITPendingBit)
   /* Clear the selected I2C flag */
   I2C->SR2 = (uint8_t)((uint16_t)~flagpos);
 }
-#endif
 
 /**
   * @}

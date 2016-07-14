@@ -29,8 +29,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm8s_tim6.h"
 
-#if defined (STM8S903) || defined (STM8AF622x)
-
 /** @addtogroup STM8S_StdPeriph_Driver
   * @{
   */
@@ -513,6 +511,5 @@ void TIM6_SelectSlaveMode(TIM6_SlaveMode_TypeDef TIM6_SlaveMode)
   * @}
   */
   
-#endif //defined (STM8S903) || defined (STM8AF622x)
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

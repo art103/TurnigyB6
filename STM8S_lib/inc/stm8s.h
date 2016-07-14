@@ -135,21 +135,24 @@
      defined (STM8AF62Ax)
    /*!< Used with memory Models for code higher than 64K */
   #define MEMCPY fmemcpy
- #else /* STM8S903, STM8S103, STM8S003, STM8S105, STM8AF626x */
+ #else /* STM8S903, STM8S103, STM8S003, STM8S105, STM8AF626x, STM8AF622x */
   /*!< Used with memory Models for code less than 64K */
   #define MEMCPY memcpy
- #endif /* STM8S208 or STM8S207 or STM8S007 or STM8AF62Ax or STM8AF52Ax */
+ #endif /* STM8S208 or STM8S207 or STM8S007 or STM8AF62Ax or STM8AF52Ax */ 
 #else /*_IAR_*/
  #define FAR  __far
-// #define NEAR __near
- #define NEAR //hack SDCC gets confused by __near
+#if !defined(SDCC)
+ #define NEAR __near
+#else
+ #define NEAR // SDCC doesn't support __near (yet?)
+#endif
  #define TINY __tiny
  #define EEPROM __eeprom
  #define CONST  const
 #endif /* __CSMC__ */
 
 /* For FLASH routines, select whether pointer will be declared as near (2 bytes,
-   to handle code smaller than 64KB) or far (3 bytes, to handle code larger
+   to handle code smaller than 64KB) or far (3 bytes, to handle code larger 
    than 64K) */
 
 #if defined (STM8S105) || defined (STM8S005) || defined (STM8S103) || defined (STM8S003) || \
