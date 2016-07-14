@@ -5,8 +5,9 @@
 #include "pwm.h"
 
 // PWM Timer reload value (10KHz)
-#define PWM_TIMER_BASE  ((HSI_VALUE / 10000) - 1)
-
+#define PWM_TIMER_HZ	20000
+#define PWM_TIMER_BASE  ((HSI_VALUE / PWM_TIMER_HZ) - 1)
+#define PID_P (PWM_TIMER_HZ / 1000)
 /*
  * Initialize the Buck / Boost converter PWM outputs.
  */
@@ -137,7 +138,7 @@ void pwm_run_pid(void)
     if (target_current > battery_current)// + (2 * target_current / 100))   // Stop oscillations.
     {
         delta = target_current - battery_current;
-        delta /= 10;
+        delta /= PID_P;
         if (delta == 0)
             delta = 1;
 
@@ -164,7 +165,7 @@ void pwm_run_pid(void)
     else if (target_current < battery_current)
     {
         delta = battery_current - target_current;
-        delta /= 10;
+        delta /= PID_P;
         if (delta == 0)
             delta = 1;
 
