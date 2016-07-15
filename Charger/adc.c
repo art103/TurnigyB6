@@ -9,7 +9,7 @@
 
 /*
  * Mapping from MUX Channels to Cells.
- * 
+ *
  * 0 - Cell 4
  * 1 - Cell 5
  * 2 - Cell 6
@@ -18,7 +18,7 @@
  * 5 - Cell 2 NC?
  * 6 - Cell 1
  * 7 - Cell 1 NC?
- * 
+ *
  */
 static const uint8_t cell_mapping[MUX_VALUES] = {6, 4, 3, 0, 1, 2};
 
@@ -182,7 +182,7 @@ void adc_sweep(void)
             case MUX_VALUES:
                 tmp = adc_values[MUX_VALUES];
                 tmp *= calibration[MUX_VALUES];
-                pwm_curr_avg += tmp / 100;
+                pwm_curr = tmp / 100;
                 batt_curr_avg += tmp / 100;
             break;
 
@@ -205,7 +205,6 @@ void adc_sweep(void)
         }
     }
 
-    // Increment average counters
-    pwm_curr_count++;
+    // Increment average counter
     average_count++;
 }

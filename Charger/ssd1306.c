@@ -185,10 +185,8 @@ int lcd_init(void)
     // 128x64 OLED "Crius"
     initialized = TRUE;
 
-	GPIO_WriteLow(GPIOD, GPIO_PIN_0);
-
     // Wait up to 1.5s for the LCD to respond
-    for (tries = 0; tries < 15; tries++)
+    for (tries = 0; tries < 3; tries++)
     {
         ret = ssd1306_command(SSD1306_CMD_SET_DISPLAY_OFF);
         if (ret == 0)
@@ -291,7 +289,7 @@ uint8_t h = 0;
 uint8_t t = 0;
 int16_t u = 0;
 
-void lcd_write_digits(int16_t val, uint8_t colour)
+void lcd_write_digits(int16_t val, uint8_t thdp, uint8_t colour)
 {
     if (val < 0) u = -val;
     else u = val;
@@ -308,11 +306,15 @@ void lcd_write_digits(int16_t val, uint8_t colour)
 
     if (tth > 0)
         lcd_write_char(tth + '0', colour);
-    if (tth > 0 || th > 0)
+    if (tth > 0 || th > 0 || thdp)
         lcd_write_char(th + '0', colour);
-    if (tth > 0 || th > 0 || h > 0)
+    if (thdp)
+    {
+		lcd_write_char('.', colour);
+	}
+    if (tth > 0 || th > 0 || h > 0 || thdp)
         lcd_write_char(h + '0', colour);
-    if (tth > 0 || th > 0 || h > 0 || t > 0)
+    if (tth > 0 || th > 0 || h > 0 || t > 0 || thdp)
         lcd_write_char(t + '0', colour);
     lcd_write_char(u + '0', colour);
 }

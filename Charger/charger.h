@@ -5,12 +5,12 @@
 #define MUX_VALUES      (6)     // Number of values to read from Analogue Mux.
 
 #define MAX_CELL_V      (4250)  // Charge Abort voltage
-#define MAX_CELL_V_CHG  (3950)  // Charge Termination voltage
+#define MAX_CELL_V_CHG  (4180)  // Charge Termination voltage
 #define MIN_CELL_V      (2900)  // Minimum voltage to register a cell as usable
 #define CELL_PRESENT_V  (1500)  // Value to register a cell as present
 #define PACK_PRESENT_V  (2000)  // Value above which to register the main connector present.
 
-#define INITIAL_CHARGE_CURRENT  (500)       // Measurement charge current (mA)
+#define INITIAL_CHARGE_CURRENT  (1300)       // Measurement charge current (mA)
 #define MAX_CHARGE_CURRENT      (5000)      // Maximum current output (mA)
 #define MAX_CHARGE_POWER        (50000000)  // Maximum power output (mW)
 #define CHARGE_RATE             (1)         // Charge rate in C
@@ -58,8 +58,7 @@ extern uint16_t battery_current;
 
 extern uint8_t num_cells;
 
-extern uint32_t pwm_curr_avg;
-extern uint16_t pwm_curr_count;
+extern uint16_t pwm_curr;
 
 extern uint16_t average_count;
 extern uint32_t batt_curr_avg;

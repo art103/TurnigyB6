@@ -101,11 +101,11 @@ void balance_pack(void)
 				call_count = 0;
 			}
 		}
-    }
-    else if (call_count >= 7)
-    {
-        // let the cells settle
-        balancer_off();
-        call_count = 0;
+		else if (call_count >= 7)
+		{
+			// let the cells settle
+			balancer_off();
+			call_count = 0;
+		}
     }
 }

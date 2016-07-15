@@ -7,7 +7,18 @@
 // PWM Timer reload value (10KHz)
 #define PWM_TIMER_HZ	20000
 #define PWM_TIMER_BASE  ((HSI_VALUE / PWM_TIMER_HZ) - 1)
-#define PID_P (PWM_TIMER_HZ / 1000)
+#define PID_P 100
+#define PID_I 300
+
+#if (PWM_TIMER_HZ < 500)
+	#error "PWM: Need to re-consider variable storage sizes"
+#endif
+
+uint16_t target_current = 0;
+static int16_t buck_val = 0;
+static int16_t boost_val = 0;
+static int16_t pid_i = 0;
+
 /*
  * Initialize the Buck / Boost converter PWM outputs.
  */
@@ -95,10 +106,6 @@ void pwm_set(uint16_t buck, uint16_t boost)
     TIM1->CCR4L = (uint8_t)boost;
 }
 
-uint16_t target_current = 0;
-static uint16_t buck_val = 0;
-static uint16_t boost_val = 0;
-
 /*
  * Set the current to current mA (0-5000)
  */
@@ -123,7 +130,8 @@ void pwm_set_current(uint16_t current)
  */
 void pwm_run_pid(void)
 {
-    uint16_t delta;
+    int16_t delta;
+    int16_t delta_pid;
     uint32_t calc;
 
     // Make sure we stay within the 50W power limit.
@@ -134,72 +142,54 @@ void pwm_run_pid(void)
         target_current = calc;
     }
 
-    // Going up.
-    if (target_current > battery_current)// + (2 * target_current / 100))   // Stop oscillations.
-    {
-        delta = target_current - battery_current;
-        delta /= PID_P;
-        if (delta == 0)
-            delta = 1;
-
+	delta = (int16_t)target_current - (int16_t)battery_current;
+	delta_pid = delta / PID_P;
+	
+	// Keep track of the delta over time and compensate.
+	pid_i += delta_pid;
+	delta_pid += pid_i / PID_I;
+	
+	if (delta < 0)
+		delta = -delta;
+	
+	// Aim for target within 2%.
+	calc = 2 * target_current / 100;
+	
+	if (delta > calc)
+	{
         if (buck_val == PWM_TIMER_BASE)
         {
-            boost_val += delta;
+            boost_val += delta_pid;
 
             // Limit the boost value to avoid short circuit.
-            if (boost_val > (PWM_TIMER_BASE / 3))
+            if (boost_val > (PWM_TIMER_BASE / 2))
             {
-                boost_val = (PWM_TIMER_BASE / 3);
+                boost_val = (PWM_TIMER_BASE / 2);
             }
+            else if (boost_val < 0)
+            {
+				buck_val--;
+				boost_val = 0;
+			}
         }
         else
         {
-            buck_val += delta;
+            buck_val += delta_pid;
             if (buck_val > PWM_TIMER_BASE)
             {
                 buck_val = PWM_TIMER_BASE;
             }
+            else if (buck_val < 0)
+            {
+				buck_val = 0;
+			}
         }
     }
-    // Going down.
-    else if (target_current < battery_current)
+    else
     {
-        delta = battery_current - target_current;
-        delta /= PID_P;
-        if (delta == 0)
-            delta = 1;
-
-        if (buck_val == PWM_TIMER_BASE)
-        {
-            if (boost_val >= delta)
-            {
-                boost_val -= delta;
-            }
-            else
-            {
-                boost_val = 0;
-                if (buck_val >= delta)
-                {
-                    buck_val -= delta;
-                }
-                else
-                {
-                    buck_val = 0;
-                }
-            }
-        }
-        else
-        {
-            if (buck_val >= delta)
-            {
-                buck_val -= delta;
-            }
-            else
-            {
-                buck_val = 0;
-            }
-        }
-    }
+		// Happy medium.
+		pid_i = 0;
+	}
 
     pwm_set(buck_val, boost_val);
 }

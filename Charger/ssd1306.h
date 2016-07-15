@@ -60,7 +60,7 @@ void i2c_isr(void);
 int lcd_init(void);
 void lcd_write_char(uint8_t c, uint8_t colour);
 void lcd_write_string(char *s, uint8_t colour);
-void lcd_write_digits(int16_t val, uint8_t colour);
+void lcd_write_digits(int16_t val, uint8_t thdp, uint8_t colour);
 void lcd_clear(uint8_t colour);
 void lcd_set_cusor(uint8_t x, uint8_t y);
 void lcd_update(void);
