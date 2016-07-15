@@ -1,3 +1,21 @@
+/*
+    ChARTurn: Custom firmware for Turnigy B6 Compact charger.
+    Copyright (C) 2016 Richard Taylor <richard@artaylor.co.uk>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/  
+
 #include "stm8s.h"
 #include "charger.h"
 #include "gpio.h"
@@ -18,6 +36,7 @@
 #define CHAR_HEIGHT 7
 #define CHAR_WIDTH  5
 
+// The LCD font must be programmed into EEPROM separately.
 const uint8_t *font_medium = 0x4000;
 
 static bool initialized = FALSE;
@@ -238,7 +257,7 @@ int lcd_init(void)
     ssd1306_command(0);
 
     // Enable Charge Pump
-    ssd1306_command(SSD1306_CHARGEPUMP); // 0x8D
+    ssd1306_command(SSD1306_CMD_CHARGEPUMP);
     ssd1306_command(0x14);
     // Turn on the Output
     ssd1306_command(SSD1306_CMD_SET_DISPLAY_ON);
