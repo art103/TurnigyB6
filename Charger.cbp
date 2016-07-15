@@ -8,9 +8,9 @@
 		<Build>
 			<Target title="Charger">
 				<Option platforms="Unix;" />
-				<Option output="$(TARGET_NAME).hex" prefix_auto="0" extension_auto="0" />
+				<Option output="build/$(TARGET_NAME).hex" prefix_auto="0" extension_auto="0" />
 				<Option working_dir="" />
-				<Option object_output="obj" />
+				<Option object_output="build/obj" />
 				<Option type="5" />
 				<Option compiler="sdcc" />
 				<Compiler>
@@ -20,9 +20,9 @@
 			</Target>
 			<Target title="STM8S-DISCO">
 				<Option platforms="Unix;" />
-				<Option output="$(TARGET_NAME).hex" prefix_auto="0" extension_auto="0" />
+				<Option output="build/$(TARGET_NAME).hex" prefix_auto="0" extension_auto="0" />
 				<Option working_dir="" />
-				<Option object_output="obj" />
+				<Option object_output="build/obj" />
 				<Option type="5" />
 				<Option compiler="sdcc" />
 				<Compiler>
@@ -33,7 +33,7 @@
 		</Build>
 		<Compiler>
 			<Add option="--opt-code-size" />
-			<Add directory="../STM8S_lib/inc" />
+			<Add directory="libSTM8S/inc" />
 		</Compiler>
 		<Linker>
 			<Add option="-lstm8" />
@@ -42,39 +42,39 @@
 			<Add option="--xram-loc 0x4000" />
 			<Add directory="../STM8S_lib/lib" />
 		</Linker>
-		<Unit filename="adc.c">
+		<Unit filename="src/adc.c">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="adc.h" />
-		<Unit filename="balancer.c">
+		<Unit filename="src/adc.h" />
+		<Unit filename="src/balancer.c">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="balancer.h" />
-		<Unit filename="charger.h" />
-		<Unit filename="error.c">
+		<Unit filename="src/balancer.h" />
+		<Unit filename="src/charger.h" />
+		<Unit filename="src/error.c">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="error.h" />
-		<Unit filename="gpio.c">
+		<Unit filename="src/error.h" />
+		<Unit filename="src/gpio.c">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="gpio.h" />
-		<Unit filename="lcdfont_medium.h" />
-		<Unit filename="leds.c">
+		<Unit filename="src/gpio.h" />
+		<Unit filename="src/lcdfont_medium.h" />
+		<Unit filename="src/leds.c">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="leds.h" />
-		<Unit filename="main.c">
+		<Unit filename="src/leds.h" />
+		<Unit filename="src/main.c">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="pwm.c">
+		<Unit filename="src/pwm.c">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="pwm.h" />
-		<Unit filename="ssd1306.c">
+		<Unit filename="src/pwm.h" />
+		<Unit filename="src/ssd1306.c">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="ssd1306.h" />
+		<Unit filename="src/ssd1306.h" />
 		<Extensions>
 			<code_completion />
 			<debugger />
