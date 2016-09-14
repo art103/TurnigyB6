@@ -14,7 +14,7 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/  
+*/
 
 #include "stm8s.h"
 #include "charger.h"
@@ -23,19 +23,21 @@
 #include "pwm.h"
 
 // PWM Timer reload value (10KHz)
-#define PWM_TIMER_HZ	20000
+#define PWM_TIMER_HZ	15000
 #define PWM_TIMER_BASE  ((HSI_VALUE / PWM_TIMER_HZ) - 1)
-#define PID_P 100
-#define PID_I 300
 
 #if (PWM_TIMER_HZ < 500)
 	#error "PWM: Need to re-consider variable storage sizes"
 #endif
 
+#define HISTORY_COUNT   (2)     // * 100ms.
+
 uint16_t target_current = 0;
 static int16_t buck_val = 0;
 static int16_t boost_val = 0;
-static int16_t pid_i = 0;
+
+static int16_t last_delta = 0;
+static uint8_t slow = 0;
 
 /*
  * Initialize the Buck / Boost converter PWM outputs.
@@ -95,6 +97,9 @@ void pwm_enable(bool enable)
         GPIO_Output(GPIOC, GPIO_PIN_1, 0);  // Buck
         GPIO_Output(GPIOC, GPIO_PIN_4, 0);  // Boost
 
+        buck_val = 0;
+        boost_val = 0;
+
         // Disable the battery FET
         //GPIO_Output(GPIOB, GPIO_PIN_4, 1);
     }
@@ -129,7 +134,19 @@ void pwm_set(uint16_t buck, uint16_t boost)
  */
 void pwm_set_current(uint16_t current)
 {
-    pwm_enable(TRUE);
+    if (current > 0 && target_current == 0)
+    {
+        pwm_enable(TRUE);
+    }
+    else
+    {
+        pwm_enable(FALSE);
+        last_delta = 0;
+        slow = 0;
+        target_current = 0;
+        return;
+    }
+
 
     if (current > battery_capacity * CHARGE_RATE)
         current = battery_capacity * CHARGE_RATE;
@@ -146,34 +163,68 @@ void pwm_set_current(uint16_t current)
  * the PWM accordingly. This should be a PI, maybe D,
  * but is P only due to flash space.
  */
+
 void pwm_run_pid(void)
 {
+    static int16_t delta_pid = 0;
     int16_t delta;
-    int16_t delta_pid;
     uint32_t calc;
 
+    if (target_current == 0)
+    {
+        return;
+    }
+
     // Make sure we stay within the 50W power limit.
-    calc = target_current * battery_voltage;
+    calc = target_current;
+    calc *= pwm_vol;
     if (calc > MAX_CHARGE_POWER)
     {
-        calc = MAX_CHARGE_POWER / battery_voltage;
+        calc = MAX_CHARGE_POWER / pwm_vol;
         target_current = calc;
     }
 
-	delta = (int16_t)target_current - (int16_t)battery_current;
-	delta_pid = delta / PID_P;
-	
-	// Keep track of the delta over time and compensate.
-	pid_i += delta_pid;
-	delta_pid += pid_i / PID_I;
-	
-	if (delta < 0)
-		delta = -delta;
-	
-	// Aim for target within 2%.
-	calc = 2 * target_current / 100;
-	
-	if (delta > calc)
+	delta = (int16_t)target_current - (int16_t)pwm_curr;
+
+#if 0
+    // Don't take too long to ramp through the BUCK phase if input < output voltage.
+	if (battery_voltage > input_voltage && delta > 1000 && buck_val != PWM_TIMER_BASE)
+	{
+       buck_val = PWM_TIMER_BASE;
+	}
+#endif
+
+    if (delta < -500)
+    {
+        error(ERROR_OVER_CURRENT);
+    }
+
+    if (delta > 0)
+    {
+        if (delta_pid < 0)
+            delta_pid = 0;
+
+        if ((last_delta >= delta) && ((last_delta - delta) < 10))
+            delta_pid++;
+        else
+            delta_pid = 0;
+    }
+    else
+    {
+        if (delta_pid > 0)
+            delta_pid = -delta_pid / 2;
+        else
+            delta_pid--;
+    }
+
+    last_delta = delta;
+
+    if (delta < 0)
+    {
+        delta = -delta;
+    }
+
+	if (delta >= 25)
 	{
         if (buck_val == PWM_TIMER_BASE)
         {
@@ -186,7 +237,7 @@ void pwm_run_pid(void)
             }
             else if (boost_val < 0)
             {
-				buck_val--;
+				buck_val += boost_val;
 				boost_val = 0;
 			}
         }
@@ -197,17 +248,18 @@ void pwm_run_pid(void)
             {
                 buck_val = PWM_TIMER_BASE;
             }
-            else if (buck_val < 0)
-            {
-				buck_val = 0;
-			}
+        }
+
+        if (boost_val < 0)
+        {
+            boost_val = 0;
+        }
+
+        if (buck_val < 0)
+        {
+            buck_val = 0;
         }
     }
-    else
-    {
-		// Happy medium.
-		pid_i = 0;
-	}
 
     pwm_set(buck_val, boost_val);
 }

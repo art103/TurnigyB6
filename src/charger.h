@@ -14,7 +14,7 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/  
+*/
 
 #ifndef _CHARGER_H_
 #define _CHARGER_H_
@@ -43,7 +43,7 @@
 #define ENABLE_EXTRA_LCD_INFO               // Extra LCD output (may exceed the flash limit).
 
 // Force a specific charge current and don't measure the pack (debugging).
-//#define FIXED_CHARGE_CURRENT  (1400)
+#define FIXED_CHARGE_CURRENT  (1400)
 
 /*
  * IO Pin Structure
@@ -77,6 +77,7 @@ extern uint16_t battery_current;
 extern uint8_t num_cells;
 
 extern uint16_t pwm_curr;
+extern uint16_t pwm_vol;
 
 extern uint16_t average_count;
 extern uint32_t batt_curr_avg;

@@ -14,7 +14,7 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/  
+*/
 
 #include "stm8s.h"
 #include "charger.h"
@@ -28,7 +28,7 @@
 #include "ssd1306.h"
 
 // ToDo: Move this to EEPROM.
-const uint16_t calibration[MUX_VALUES + 3] = {968, 971, 975, 992, 995, 995, 860, 2550, 3418};	// Bi, Bv, Iv
+const uint16_t calibration[MUX_VALUES + 3] = {967, 973, 976, 992, 981, 985, 860, 2571, 3439};	// Bi, Bv, Iv
 
 // Global 1ms system timer tick
 volatile uint32_t g_timer_tick = 0;
@@ -39,6 +39,7 @@ uint16_t battery_voltage;           // Battery voltage (averaged).
 uint16_t battery_current;           // Battery current (averaged).
 
 uint16_t pwm_curr;                  // Battery current (10ms average).
+uint16_t pwm_vol;
 
 // Calculated every 100ms
 uint8_t num_cells;                  // Number of cells on the balance port.
@@ -304,11 +305,16 @@ void monitor_and_charge_pack(void)
 
                             // Start charge at measuring current.
                             battery_capacity = INITIAL_CHARGE_CURRENT;
-                            
+                            state = STATE_MEASURING;
+
+
                             // Manual override.
-                            battery_capacity = 1400;
+#ifdef FIXED_CHARGE_CURRENT
+                            battery_capacity = FIXED_CHARGE_CURRENT;
                             pwm_set_current(battery_capacity);
                             state = STATE_CHARGING;
+#endif
+
                         }
                     break;
 
@@ -328,6 +334,11 @@ void monitor_and_charge_pack(void)
 							case 0:
 								pwm_set_current(battery_capacity * CHARGE_RATE);
 							break;
+							case 1:
+                                // Wait for the charge rate to settle (within 100mA).
+								if (battery_current < battery_capacity * CHARGE_RATE - 100)
+                                    measuring_state = 0;
+							break;
 
 							case 20:
 								pwm_set_current(0);
@@ -345,6 +356,11 @@ void monitor_and_charge_pack(void)
 							case 35:
 								pack_start = pack_avg / 5;
 								pwm_set_current(battery_capacity * CHARGE_RATE);
+							break;
+							case 36:
+                                // Wait for the charge rate to settle (within 100mA).
+								if (battery_current < battery_capacity * CHARGE_RATE - 100)
+                                    measuring_state = 35;
 							break;
 
 							case 95:
@@ -408,24 +424,27 @@ void monitor_and_charge_pack(void)
                         {
                             if (cell_max > MAX_CELL_V_CHG)
                             {
-                                pwm_set_current(target_current - 100);
+                                pwm_set_current(target_current - 50);
                                 cv_phase = 1;
                             }
-                            else if (cell_max == MAX_CELL_V_CHG)
+                            else if (cv_phase > 0)
                             {
-								// Stay here.
-							}
-                            else if (battery_current < battery_capacity)
-                            {
-                                pwm_set_current(target_current + 10);
-                            }
-                        }
+                                if (cell_max == MAX_CELL_V_CHG)
+                                {
+                                    // Stay here.
+                                }
+                                else if (battery_current < battery_capacity)
+                                {
+                                    pwm_set_current(target_current + 10);
+                                }
 
-                        // Complete at 0.1C (or 100mA, whichever is higher)
-                        if ((target_current < 100) || (target_current <= battery_capacity / 10))
-                        {
-                            state = STATE_DONE;
-                            error(ERROR_DONE);
+                                // Complete at 0.1C (or 100mA, whichever is higher)
+                                if ((target_current < 100) || (target_current <= battery_capacity / 10))
+                                {
+                                    state = STATE_DONE;
+                                    error(ERROR_DONE);
+                                }
+                            }
                         }
 
                         // Don't charge for longer than CHARGE_TIMEOUT
@@ -525,6 +544,12 @@ int main(void)
     delay_ms(100);
     buzzer_off();
 
+#ifdef PWM_TESTING
+    battery_capacity = FIXED_CHARGE_CURRENT;
+    pwm_set_current(battery_capacity);
+    state = STATE_CHARGING;
+#endif // PWM_TESTING
+
     // The main loop
     while(1)
     {
@@ -533,7 +558,6 @@ int main(void)
         {
             timer_10ms = g_timer_tick + 10;
             adc_sweep();
-
             // Check and adjust current.
             pwm_run_pid();
         }
@@ -604,9 +628,11 @@ int main(void)
             average_count = 0;
 
             update_lcd_info();
+#ifndef PWM_TESTING
             monitor_input();
             monitor_and_charge_pack();
             balance_pack();
+#endif // PWM_TESTING
 
             // Flash the cells that are balancing
             if (state >= STATE_CHARGING)

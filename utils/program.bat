@@ -1,1 +1,1 @@
-"C:\Program Files (x86)\STMicroelectronics\st_toolset\stvp\STVP_CmdLine.exe" -Device=STM8S903K3 -FileProg=Charger.hex
+"C:\Program Files (x86)\STMicroelectronics\st_toolset\stvp\STVP_CmdLine.exe" -Device=STM8S903K3 -FileProg=build\Charger.hex

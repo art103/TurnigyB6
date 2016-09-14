@@ -14,7 +14,7 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/  
+*/
 
 #include "stm8s.h"
 #include "charger.h"
@@ -208,6 +208,7 @@ void adc_sweep(void)
             case MUX_VALUES + 1:
                 tmp = adc_values[MUX_VALUES + 1];
                 tmp *= calibration[MUX_VALUES + 1];
+                pwm_vol = tmp / 100;
                 batt_vol_avg += tmp / 100;
             break;
 

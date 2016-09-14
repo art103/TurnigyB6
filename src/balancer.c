@@ -14,7 +14,7 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/  
+*/
 
 // core header file from our library project:
 #include "stm8s.h"
@@ -98,7 +98,7 @@ void balance_pack(void)
     // Only balance during charging or after completion
     if (state >= STATE_CHARGING)
 	{
-		if (call_count == 2)
+		if (call_count == 4)
 		{
 			// Cells have had time to settle, check them again.
 			if ((cell_max - cell_min) > BALANCE_THRESHOLD)
@@ -119,7 +119,7 @@ void balance_pack(void)
 				call_count = 0;
 			}
 		}
-		else if (call_count >= 7)
+		else if (call_count >= 8)
 		{
 			// let the cells settle
 			balancer_off();
