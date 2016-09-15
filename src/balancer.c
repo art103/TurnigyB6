@@ -98,7 +98,7 @@ void balance_pack(void)
     // Only balance during charging or after completion
     if (state >= STATE_CHARGING)
 	{
-		if (call_count == 4)
+		if (call_count == 3)
 		{
 			// Cells have had time to settle, check them again.
 			if ((cell_max - cell_min) > BALANCE_THRESHOLD)
@@ -119,7 +119,7 @@ void balance_pack(void)
 				call_count = 0;
 			}
 		}
-		else if (call_count >= 8)
+		else if (call_count >= 9)
 		{
 			// let the cells settle
 			balancer_off();
