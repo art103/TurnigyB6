@@ -204,7 +204,7 @@ void pwm_run_pid(void)
         if (delta_pid < 0)
             delta_pid = 0;
 
-        if ((last_delta >= delta) && ((last_delta - delta) < 10))
+        if ((last_delta >= delta) && ((last_delta - delta) < 7))
             delta_pid++;
         else
             delta_pid = 0;
@@ -212,7 +212,7 @@ void pwm_run_pid(void)
     else
     {
         if (delta_pid > 0)
-            delta_pid = -delta_pid / 2;
+            delta_pid = -delta_pid;
         else
             delta_pid--;
     }

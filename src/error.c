@@ -14,7 +14,7 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/  
+*/
 
 #include "stm8s.h"
 #include "charger.h"
@@ -39,9 +39,9 @@ void error(uint8_t error_code)
     {
         // Buzzer
         buzzer_on(BEEP_FREQUENCY_2KHZ);
-        delay_ms(10);
+        delay_ms(50);
         buzzer_off();
-        delay_ms(100);
+        delay_ms(200);
     }
 
     if (error_code == ERROR_DONE)
@@ -60,4 +60,14 @@ void error(uint8_t error_code)
             delay_ms(250);
         }
     }
+
+    // Reset the averages (they will be wrong after the error)
+    for (i=0; i<NUM_CHANNELS; ++i)
+    {
+        balance_avg[i] = 0;
+    }
+    batt_curr_avg = 0;
+    batt_vol_avg = 0;
+    input_vol_avg = 0;
+    average_count = 0;
 }

@@ -14,7 +14,7 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/  
+*/
 
 #include "stm8s.h"
 #include "charger.h"
@@ -325,13 +325,13 @@ void lcd_write_digits(int16_t val, uint8_t thdp, uint8_t colour)
 
     if (tth > 0)
         lcd_write_char(tth + '0', colour);
-    if (tth > 0 || th > 0 || thdp)
+    if (tth > 0 || th > 0 || thdp == 1)
         lcd_write_char(th + '0', colour);
-    if (thdp)
+    if (thdp == 1)
     {
 		lcd_write_char('.', colour);
 	}
-    if (tth > 0 || th > 0 || h > 0 || thdp)
+    if (tth > 0 || th > 0 || h > 0 || thdp == 1)
         lcd_write_char(h + '0', colour);
     if (tth > 0 || th > 0 || h > 0 || t > 0 || thdp)
         lcd_write_char(t + '0', colour);

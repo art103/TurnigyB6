@@ -37,6 +37,7 @@ volatile uint32_t g_timer_tick = 0;
 uint16_t input_voltage;             // Input voltage (averaged).
 uint16_t battery_voltage;           // Battery voltage (averaged).
 uint16_t battery_current;           // Battery current (averaged).
+uint32_t battery_added;             // uAh added to the battery.
 
 uint16_t pwm_curr;                  // Battery current (10ms average).
 uint16_t pwm_vol;
@@ -141,68 +142,80 @@ void system_init(void)
  * When the LCD is enabled, this formats and displays the cell and
  * pack information on screen.
  */
+const char s_volts[] = "v ";
+const char s_current[] = "mA   ";
+
 void update_lcd_info(void)
 {
     uint8_t i;
 
-    for (i=0; i<NUM_CHANNELS; ++i)
-    {
-        lcd_set_cusor(88, 8 * (i+1));
-        lcd_write_string("      ", 1);
-        lcd_set_cusor(88, 8 * (i+1));
-        lcd_write_digits(balance_avg[i], 1, 1);
-        lcd_write_char('v', 1);
-        lcd_set_cusor(82, 8 * (i+1));
-        if (balancing & (1 << i))
-        {
-            lcd_write_char('B', 1);
-        }
-        else
-        {
-            lcd_write_char(' ', 1);
-        }
-    }
-
-    // Battery Voltage
-    lcd_set_cusor(18, 16);
-    lcd_write_digits(battery_voltage, 1, 1);
-    lcd_write_string("v ", 1);
-
-    // Battery Current
-    lcd_set_cusor(18, 24);
-    lcd_write_digits(battery_current, 0, 1);
-    lcd_write_string("mA   ", 1);
+    // Input Voltage
+    lcd_set_cusor(0, 16);
+    lcd_write_digits(input_voltage, 1, 1);
+    lcd_write_string(s_volts, 1);
 
     // Battery Capacity
-    lcd_set_cusor(18, 32);
+    lcd_set_cusor(48, 16);
     lcd_write_digits(battery_capacity, 0, 1);
-    lcd_write_string("mAh   ", 1);
+    lcd_write_string(s_current, 1);
 
-    // Input Voltage
-    lcd_set_cusor(18, 40);
-    lcd_write_digits(input_voltage, 1, 1);
-    lcd_write_string("v ", 1);
+    // mAh Added
+    lcd_set_cusor(90, 16);
+    lcd_write_digits(battery_added / 1000, 0, 1);
+
+    // Battery Voltage
+    lcd_set_cusor(0, 24);
+    lcd_write_digits(battery_voltage, 1, 1);
+    lcd_write_string(s_volts, 1);
+
+    // Battery Current
+    lcd_set_cusor(48, 24);
+    lcd_write_digits(battery_current, 0, 1);
+    lcd_write_string(s_current, 1);
+
+    // Battery Percentage
+    lcd_set_cusor(90, 24);
+    if (balance_avg[0] > 3500)
+        lcd_write_digits((balance_avg[0] - 3500) / 7, 0, 1);
+    else
+        lcd_write_digits(0, 0, 1);
+    lcd_write_string("%  ", 1);
+
+    // Cell Voltages
+    lcd_set_cusor(0, 40);
+    for (i=0; i<NUM_CHANNELS; ++i)
+    {
+        if (i == 3)
+            lcd_set_cusor(0, 48);
+        lcd_write_digits(balance_avg[i], 1, (balancing & (1 << i))?0:1);
+        lcd_write_char('v', (balancing & (1 << i))?0:1);
+        if (i != 2 && i != 5)
+            lcd_write_char(' ', 1);
+    }
 
 #ifdef ENABLE_EXTRA_LCD_INFO
     lcd_set_cusor(0, 56);
     switch (state)
     {
         case STATE_ERROR:
-            lcd_write_string("** Error **", 1);
+            lcd_write_string(" Error :-(", 0);
         break;
         case STATE_CHECKING:
-            lcd_write_string("Checking   ", 1);
+            lcd_write_string(" Checking t:         ", 0);
         break;
         case STATE_MEASURING:
-            lcd_write_string("Measuring  ", 1);
+            lcd_write_string(" Measuring", 0);
         break;
         case STATE_CHARGING:
-            lcd_write_string("Charging   ", 1);
+            lcd_write_string(" Charging ", 0);
         break;
         case STATE_DONE:
-            lcd_write_string("Finished   ", 1);
+            lcd_write_string(" Finished ", 0);
         break;
     }
+
+    lcd_set_cusor(74, 56);
+    lcd_write_digits(g_timer_tick / 1000, 2, 0);
 #endif
 }
 
@@ -221,11 +234,6 @@ void monitor_and_charge_pack(void)
     // Check to see if we have at least 2 cells.
     if (num_cells < 2)
     {
-#ifdef ENABLE_EXTRA_LCD_INFO
-        lcd_set_cusor(18, 8);
-        lcd_write_string("None ", 1);
-#endif // ENABLE_EXTRA_LCD_INFO
-
         // Was the balance port removed?
         if (state >= STATE_MEASURING)
         {
@@ -236,11 +244,6 @@ void monitor_and_charge_pack(void)
     else
     {
         uint8_t ok = 1; // Assume everything is ok for now.
-
-        // Display the number of detected cells.
-        lcd_set_cusor(18, 8);
-        lcd_write_digits(num_cells, 0, 1);
-        lcd_write_string("S   ", 1);
 
         // Iterate through the balance connector checking the cells.
         for (i=0; i<num_cells; ++i)
@@ -516,19 +519,11 @@ int main(void)
     lcd_init();
 #ifdef ENABLE_EXTRA_LCD_INFO
     lcd_set_cusor(0,0);
-    lcd_write_string(" B6 Compact+ Charger ", 0);
-
-    // Battery and Input stats
-    lcd_set_cusor(0, 8);
-    lcd_write_string("Cl:", 1);
-    lcd_set_cusor(0, 16);
-    lcd_write_string("Vb:", 1);
-    lcd_set_cusor(0, 24);
-    lcd_write_string("Ib:", 1);
-    lcd_set_cusor(0, 32);
-    lcd_write_string("Cb:", 1);
-    lcd_set_cusor(0, 40);
-    lcd_write_string("Vi:", 1);
+    lcd_write_string(" B6 Compact+ Charger ", 1);
+    lcd_set_cusor(0,8);
+    lcd_write_string(" Vi/Vb  It/Ib  mAh/% ", 0);
+    lcd_set_cusor(0,32);
+    lcd_write_string(" Balance Port Values ", 0);
 #endif
 
     // Disable the battery FET
@@ -623,6 +618,9 @@ int main(void)
             // Calculate the input voltage average
             input_voltage = input_vol_avg / average_count;
             input_vol_avg = 0;
+
+            // Calculate how many uAh we added.
+            battery_added += (uint32_t)battery_current * 1000 / 3600;
 
             // Reset the average counter
             average_count = 0;
