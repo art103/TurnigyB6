@@ -134,7 +134,7 @@ void pwm_set(uint16_t buck, uint16_t boost)
  */
 void pwm_set_current(uint16_t current)
 {
-    if (current > 0 && target_current == 0)
+    if (current > 0)
     {
         pwm_enable(TRUE);
     }
@@ -150,6 +150,7 @@ void pwm_set_current(uint16_t current)
 
     if (current > battery_capacity * CHARGE_RATE)
         current = battery_capacity * CHARGE_RATE;
+
     if (current > MAX_CHARGE_CURRENT)
         current = MAX_CHARGE_CURRENT;
 
@@ -186,17 +187,15 @@ void pwm_run_pid(void)
 
 	delta = (int16_t)target_current - (int16_t)pwm_curr;
 
-#if 0
-    // Don't take too long to ramp through the BUCK phase if input < output voltage.
-	if (battery_voltage > input_voltage && delta > 1000 && buck_val != PWM_TIMER_BASE)
-	{
-       buck_val = PWM_TIMER_BASE;
-	}
-#endif
-
+    // There is an occasional nasty over current condition.
+    // Set all to zero and start ramping up again.
     if (delta < -500)
     {
-        error(ERROR_OVER_CURRENT);
+        //error(ERROR_OVER_CURRENT);
+        buck_val = 0;
+        boost_val = 0;
+        pwm_set(buck_val, boost_val);
+        return;
     }
 
     if (delta > 0)
@@ -235,11 +234,6 @@ void pwm_run_pid(void)
             {
                 boost_val = (PWM_TIMER_BASE / 2);
             }
-            else if (boost_val < 0)
-            {
-				buck_val += boost_val;
-				boost_val = 0;
-			}
         }
         else
         {
