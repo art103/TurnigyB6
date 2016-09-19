@@ -65,9 +65,9 @@ uint8_t balancing;                  // Bitmask of channels being balanced.
 uint8_t cv_phase = 0;                  // Bitmask of channels being balanced.
 
 // Values for capacity calcualtion
-uint16_t pack_start;
-uint16_t pack_end;
-uint32_t pack_avg;
+uint16_t c_v1;
+uint16_t c_v2;
+uint32_t c_mah;
 
 /*
  * System timer ISR
@@ -201,7 +201,7 @@ void update_lcd_info(void)
             lcd_write_string(" Error :-(", 0);
         break;
         case STATE_CHECKING:
-            lcd_write_string(" Checking t:         ", 0);
+            lcd_write_string(" Checking  t:        ", 0);
         break;
         case STATE_MEASURING:
             lcd_write_string(" Measuring", 0);
@@ -214,7 +214,7 @@ void update_lcd_info(void)
         break;
     }
 
-    lcd_set_cusor(74, 56);
+    lcd_set_cusor(80, 56);
     lcd_write_digits(g_timer_tick / 1000, 2, 0);
 #endif
 }
@@ -229,7 +229,9 @@ void monitor_and_charge_pack(void)
 {
     uint8_t i;
     static uint16_t measuring_state;
+#ifndef FIXED_CHARGE_CURRENT
     uint32_t calc;
+#endif // FIXED_CHARGE_CURRENT
 
     // Check to see if we have at least 2 cells.
     if (num_cells < 2)
@@ -321,6 +323,7 @@ void monitor_and_charge_pack(void)
                         }
                     break;
 
+#ifndef FIXED_CHARGE_CURRENT
                     case STATE_MEASURING:
                         // Check to see if we hit our termination voltage.
                         if (cell_max >= MAX_CELL_V_CHG)
@@ -337,85 +340,45 @@ void monitor_and_charge_pack(void)
 							case 0:
 								pwm_set_current(battery_capacity * CHARGE_RATE);
 							break;
+
 							case 1:
-                                // Wait for the charge rate to settle (within 100mA).
-								if (battery_current < battery_capacity * CHARGE_RATE - 100)
+                                // Get to within 100mA of target.
+                                if (battery_current < target_current - 100)
                                     measuring_state = 0;
 							break;
 
-							case 20:
-								pwm_set_current(0);
-								pack_avg = 0;
+							case BATTERY_SETTLE_TIME:
+                                c_v1 = battery_voltage;
+                                c_mah = battery_added;
 							break;
 
-							case 30:
-							case 31:
-							case 32:
-							case 33:
-							case 34:
-								pack_avg += battery_voltage;
-							break;
+							case BATTERY_SETTLE_TIME + BATTERY_MEASURE_TIME:
+                                c_v2 = battery_voltage;
 
-							case 35:
-								pack_start = pack_avg / 5;
-								pwm_set_current(battery_capacity * CHARGE_RATE);
-							break;
-							case 36:
-                                // Wait for the charge rate to settle (within 100mA).
-								if (battery_current < battery_capacity * CHARGE_RATE - 100)
-                                    measuring_state = 35;
-							break;
+                                if (c_v2 > c_v1)
+                                {
+                                    calc = (battery_added - c_mah) * (4200 - 3300);
+                                    calc /= (c_v2 - c_v1);
+                                    calc *= num_cells;
+                                    calc /= 1000;
 
-							case 95:
-								pwm_set_current(0);
-								pack_avg = 0;
-							break;
+                                    battery_capacity = calc;
 
-							case 105:
-							case 106:
-							case 107:
-							case 108:
-							case 109:
-								pack_avg += battery_voltage;
-							break;
+                                    if (battery_capacity > target_current)
+                                    {
+                                        pwm_set_current(target_current + 100);
+                                    }
 
-							case 110:
-								pack_end = pack_avg / 5;
+                                    c_v1 = battery_voltage;
+                                    c_mah = battery_added;
+
+                                    state = STATE_CHARGING;
+                                }
 							break;
 						}
 						measuring_state++;
-
-						if (measuring_state > 110)
-						{
-                            // Calculate the pack capacity.
-                            if (pack_end <= pack_start)
-                            {
-                                // Start again (this result implies a > 40Ah pack!).
-                                measuring_state = 0;
-                            }
-                            else
-                            {
-                                calc = (4200 - 3700);	// Resting would be 4.2-3.2, but we're not resting!
-                                calc *= 3600;
-                                calc /= 60000;
-                                calc *= battery_capacity;
-                                calc /= pack_end - pack_start;
-                                battery_capacity = calc;
-
-								// Safety net for now
-								if (battery_capacity > 2200)
-								{
-									//battery_capacity = 2200;
-								}
-
-                                // Set charge rate to 1C
-                                //pwm_set_current(battery_capacity * CHARGE_RATE);
-                                pwm_set_current(INITIAL_CHARGE_CURRENT);
-
-                                state = STATE_CHARGING;
-                            }
-                        }
                     break;
+#endif // FIXED_CHARGE_CURRENT
 
                     case STATE_CHARGING:
                         // Set the Cell count LEDs to Red.
@@ -456,17 +419,17 @@ void monitor_and_charge_pack(void)
                             error(ERROR_TIMEOUT);
                         }
 
-#if 0
+#ifndef FIXED_CHARGE_CURRENT
                         // Re-measure pack regularly.
-                        if (!cv_phase && timeout++ > BATTERY_CHECK_PERIOD)
+                        if (!cv_phase && timeout++ > BATTERY_MEASURE_TIME)
                         {
                             balancer_off();
                             // Prepare the measurement cycle.
-                            measuring_state = 0;
+                            measuring_state = BATTERY_SETTLE_TIME + BATTERY_MEASURE_TIME - 2;
                             state = STATE_MEASURING;
                             timeout = 0;
                         }
-#endif
+#endif // FIXED_CHARGE_CURRENT
                     break;
 
                     case STATE_DONE:
