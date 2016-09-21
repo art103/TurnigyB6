@@ -22,7 +22,7 @@
 /*
  * Values read from ADC
  */
-extern volatile uint16_t adc_values[MUX_VALUES + 3];
+extern volatile uint16_t adc_values[NUM_CHANNELS + 3];
 
 /*
  * ADC ISR

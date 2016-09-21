@@ -64,9 +64,9 @@ void pwm_init(void)
     TIM1->CCER1 = 0x03;
     TIM1->CCMR1 = TIM1_OCMODE_PWM2;
 
-    // Setup OC4
-    TIM1->CCER2 = 0x30;
-    TIM1->CCMR4 = TIM1_OCMODE_PWM2;
+    // Setup OC3
+    TIM1->CCER2 = 0x03;
+    TIM1->CCMR3 = TIM1_OCMODE_PWM2;
 
     TIM1->OISR = 0x41;
 
@@ -95,7 +95,7 @@ void pwm_enable(bool enable)
 
         // Configure BUCK and BOOST outputs as GPIO, Low (Off).
         GPIO_Output(GPIOC, GPIO_PIN_1, 0);  // Buck
-        GPIO_Output(GPIOC, GPIO_PIN_4, 0);  // Boost
+        GPIO_Output(GPIOC, GPIO_PIN_3, 0);  // Boost
 
         buck_val = 0;
         boost_val = 0;
@@ -124,9 +124,9 @@ void pwm_set(uint16_t buck, uint16_t boost)
     TIM1->CCR1H = (uint8_t)(buck >> 8);
     TIM1->CCR1L = (uint8_t)buck;
 
-    // Set OC4 Values
-    TIM1->CCR4H = (uint8_t)(boost >> 8);
-    TIM1->CCR4L = (uint8_t)boost;
+    // Set OC3 Values
+    TIM1->CCR3H = (uint8_t)(boost >> 8);
+    TIM1->CCR3L = (uint8_t)boost;
 }
 
 /*

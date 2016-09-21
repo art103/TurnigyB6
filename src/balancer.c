@@ -25,9 +25,7 @@
  * Mapping of balancer channels to GPIOs
  */
 static const struct _pin balancer[NUM_CHANNELS] =
-{ {GPIOD, GPIO_PIN_3},
-  {GPIOD, GPIO_PIN_2},
-  {GPIOD, GPIO_PIN_0},
+{ {GPIOD, GPIO_PIN_0},
   {GPIOC, GPIO_PIN_7},
   {GPIOC, GPIO_PIN_6},
   {GPIOC, GPIO_PIN_5}

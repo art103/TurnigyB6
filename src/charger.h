@@ -19,8 +19,7 @@
 #ifndef _CHARGER_H_
 #define _CHARGER_H_
 
-#define NUM_CHANNELS    (6)     // Number of balance / LED channels.
-#define MUX_VALUES      (6)     // Number of values to read from Analogue Mux.
+#define NUM_CHANNELS    (4)     // Number of balance / LED channels.
 
 #define MAX_CELL_V      (4250)  // Charge Abort voltage
 #define MAX_CELL_V_CHG  (4180)  // Charge Termination voltage
@@ -40,6 +39,7 @@
 
 #define CHARGE_TIMEOUT          (5400000)   // How long to charge before aborting.
 
+#define ENABLE_LCD
 #define ENABLE_EXTRA_LCD_INFO               // Extra LCD output (may exceed the flash limit).
 
 // Force a specific charge current and don't measure the pack (debugging).
@@ -69,7 +69,7 @@ extern State state;
 /*
  * See main.c for a description of these.
  */
-extern volatile uint16_t adc_values[MUX_VALUES + 3];
+extern volatile uint16_t adc_values[NUM_CHANNELS + 3];
 extern uint16_t input_voltage;
 extern uint16_t battery_voltage;
 extern uint16_t battery_current;
@@ -93,7 +93,7 @@ extern uint16_t battery_capacity;
 extern uint8_t balancing;
 extern uint16_t target_current;
 
-extern const uint16_t calibration[MUX_VALUES + 3];
+extern const uint16_t calibration[NUM_CHANNELS + 3];
 
 /*
  * Delay function based on system timer

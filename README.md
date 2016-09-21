@@ -1,7 +1,7 @@
-# ChARTurn: Custom Turnigy B6 Compact Firmware
+# ChARTurn: Custom Turnigy B4 Compact Firmware
 
 ## What?
-This is a repalcement firmware for the [Turnigy B6 Compact charger](http://goo.gl/uX2E8J).
+This is a repalcement firmware for the [Turnigy B4 Compact charger](http://goo.gl/uX2E8J).
 The name comes from Ch in Charger, my initials ART and urn from Turnigy.
 
 It supports an (optional) I2C OLED display based on the ssd1306 chip like [this one](http://goo.gl/ApJXRa).
@@ -32,8 +32,7 @@ Scroll to "Other Settings" and select "Advanced Options..."
 Under "Others" in the "Object file extension" field, replace obj with rel.
 
 ## Other Information
-I have reverse engineered the schematic. It is closely related to the iMAX B6 but uses FETs in place of BiPolar Transistors. 
-It also has an STM8S CPU in place of the Atmel. 
+I have reverse engineered the schematic. It is closely related to the Turnigy B6 but shakes a few things up to keep cost down. 
 The CPU part of the schematic is accurate, the rest is for indication only and is a remnant of my own design.
 
 Programming pins are brought out and the STM8S-Discovery board works very well as a cheap programmer.

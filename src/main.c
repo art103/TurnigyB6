@@ -25,10 +25,14 @@
 #include "balancer.h"
 #include "gpio.h"
 #include "error.h"
+#ifdef ENABLE_LCD
 #include "ssd1306.h"
+#endif
+
+//#define PWM_TESTING
 
 // ToDo: Move this to EEPROM.
-const uint16_t calibration[MUX_VALUES + 3] = {967, 973, 976, 992, 981, 985, 860, 2571, 3439};	// Bi, Bv, Iv
+const uint16_t calibration[NUM_CHANNELS + 3] = {967, 966, 959, 971, 2600, 2690, 3449};	// Bi, Bv, Iv
 
 // Global 1ms system timer tick
 volatile uint32_t g_timer_tick = 0;
@@ -89,7 +93,9 @@ void system_timer(void) __interrupt(23)
  */
 void _i2c_isr(void) __interrupt(19)
 {
+#ifdef ENABLE_LCD
     i2c_isr();
+#endif
 }
 
 /*
@@ -138,6 +144,7 @@ void system_init(void)
     enableInterrupts();
 }
 
+#ifdef ENABLE_LCD
 /*
  * When the LCD is enabled, this formats and displays the cell and
  * pack information on screen.
@@ -218,6 +225,7 @@ void update_lcd_info(void)
     lcd_write_digits(g_timer_tick / 1000, 2, 0);
 #endif
 }
+#endif
 
 /*
  * Called once a second.
@@ -478,6 +486,7 @@ int main(void)
     adc_init();
     balancer_init();
 
+#ifdef ENABLE_LCD
     // Initialize the LCD
     lcd_init();
 #ifdef ENABLE_EXTRA_LCD_INFO
@@ -487,6 +496,7 @@ int main(void)
     lcd_write_string(" Vi/Vb  It/Ib  mAh/% ", 0);
     lcd_set_cusor(0,32);
     lcd_write_string(" Balance Port Values ", 0);
+#endif
 #endif
 
     // Disable the battery FET
@@ -503,7 +513,7 @@ int main(void)
     buzzer_off();
 
 #ifdef PWM_TESTING
-    battery_capacity = FIXED_CHARGE_CURRENT;
+    battery_capacity = 2000;
     pwm_set_current(battery_capacity);
     state = STATE_CHARGING;
 #endif // PWM_TESTING
@@ -588,7 +598,10 @@ int main(void)
             // Reset the average counter
             average_count = 0;
 
+#ifdef ENABLE_LCD
             update_lcd_info();
+#endif
+
 #ifndef PWM_TESTING
             monitor_input();
             monitor_and_charge_pack();
