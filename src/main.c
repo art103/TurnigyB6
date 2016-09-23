@@ -32,7 +32,7 @@
 //#define PWM_TESTING
 
 // ToDo: Move this to EEPROM.
-const uint16_t calibration[NUM_CHANNELS + 3] = {967, 966, 959, 971, 2600, 2690, 3449};	// Bi, Bv, Iv
+const uint16_t calibration[NUM_CHANNELS + 3] = {968, 966, 959, 971, 2600, 2568, 3426};	// Bi, Bv, Iv
 
 // Global 1ms system timer tick
 volatile uint32_t g_timer_tick = 0;
@@ -284,6 +284,7 @@ void monitor_and_charge_pack(void)
         // Balance connector looks ok, now check the pack.
         if (ok)
         {
+        #if 0   // Do this in pwm.c more rapidly.
             // Check to see that our battery voltage is within the
             // correct range for the detected cells.
             if ((battery_voltage > MAX_CELL_V * num_cells)
@@ -297,7 +298,9 @@ void monitor_and_charge_pack(void)
                     error(ERROR_PACK_VOLTAGE);
                 }
             }
-            else if (battery_voltage > MIN_CELL_V * num_cells)
+            else
+        #endif
+            if (battery_voltage > MIN_CELL_V * num_cells)
             {
                 switch (state)
                 {
@@ -491,7 +494,7 @@ int main(void)
     lcd_init();
 #ifdef ENABLE_EXTRA_LCD_INFO
     lcd_set_cusor(0,0);
-    lcd_write_string(" B6 Compact+ Charger ", 1);
+    lcd_write_string(" B4 Compact+ Charger ", 1);
     lcd_set_cusor(0,8);
     lcd_write_string(" Vi/Vb  It/Ib  mAh/% ", 0);
     lcd_set_cusor(0,32);
@@ -513,9 +516,10 @@ int main(void)
     buzzer_off();
 
 #ifdef PWM_TESTING
-    battery_capacity = 2000;
+    battery_capacity = 1000;
     pwm_set_current(battery_capacity);
     state = STATE_CHARGING;
+    //balancer_set(1 << 3, 0x3F);
 #endif // PWM_TESTING
 
     // The main loop

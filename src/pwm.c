@@ -187,6 +187,12 @@ void pwm_run_pid(void)
 
 	delta = (int16_t)target_current - (int16_t)pwm_curr;
 
+    calc = MAX_CELL_V * num_cells;
+	if (pwm_vol > calc)
+	{
+        error(ERROR_PACK_VOLTAGE);
+	}
+
     // There is an occasional nasty over current condition.
     // Set all to zero and start ramping up again.
     if (delta < -500)
@@ -230,9 +236,9 @@ void pwm_run_pid(void)
             boost_val += delta_pid;
 
             // Limit the boost value to avoid short circuit.
-            if (boost_val > (PWM_TIMER_BASE / 2))
+            if (boost_val > (PWM_TIMER_BASE / 4))
             {
-                boost_val = (PWM_TIMER_BASE / 2);
+                boost_val = (PWM_TIMER_BASE / 4);
             }
         }
         else
