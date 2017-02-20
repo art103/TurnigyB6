@@ -14,10 +14,15 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/  
+*/
 
 #ifndef _PWM_H_
 #define _PWM_H_
+
+// PWM Timer reload value (10KHz)
+#define PWM_TIMER_HZ	15000
+#define PWM_TIMER_BASE  ((HSI_VALUE / PWM_TIMER_HZ) - 1)
+
 /*
  * Initialize the Buck / Boost converter PWM outputs.
  */

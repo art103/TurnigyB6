@@ -22,10 +22,6 @@
 #include "gpio.h"
 #include "pwm.h"
 
-// PWM Timer reload value (10KHz)
-#define PWM_TIMER_HZ	15000
-#define PWM_TIMER_BASE  ((HSI_VALUE / PWM_TIMER_HZ) - 1)
-
 #if (PWM_TIMER_HZ < 500)
 	#error "PWM: Need to re-consider variable storage sizes"
 #endif
@@ -35,6 +31,7 @@
 uint16_t target_current = 0;
 static int16_t buck_val = 0;
 static int16_t boost_val = 0;
+static bool enabled = FALSE;
 
 static int16_t last_delta = 0;
 static uint8_t slow = 0;
@@ -103,6 +100,9 @@ void pwm_enable(bool enable)
         // Disable the battery FET
         //GPIO_Output(GPIOB, GPIO_PIN_4, 1);
     }
+
+    enabled = enable;
+    target_current = 0;
 }
 
 /*
@@ -110,14 +110,18 @@ void pwm_enable(bool enable)
  */
 void pwm_set(uint16_t buck, uint16_t boost)
 {
+    if (!enabled)
+        return;
+
     if (buck > PWM_TIMER_BASE)
     {
         buck = PWM_TIMER_BASE;
     }
 
-    if (boost > PWM_TIMER_BASE)
+    // Limit the boost range
+    if (boost > PWM_TIMER_BASE / 2)
     {
-        boost = PWM_TIMER_BASE;
+        boost = PWM_TIMER_BASE / 2;
     }
 
     // Set OC1 Values
@@ -147,7 +151,6 @@ void pwm_set_current(uint16_t current)
         return;
     }
 
-
     if (current > battery_capacity * CHARGE_RATE)
         current = battery_capacity * CHARGE_RATE;
 
@@ -155,8 +158,6 @@ void pwm_set_current(uint16_t current)
         current = MAX_CHARGE_CURRENT;
 
     target_current = current;
-
-    pwm_run_pid();
 }
 
 /*
@@ -171,10 +172,60 @@ void pwm_run_pid(void)
     int16_t delta;
     uint32_t calc;
 
-    if (target_current == 0)
+    if (target_current == 0 || !enabled)
     {
         return;
     }
+
+    if (num_cells == 1)
+    {
+        cell_max = pwm_vol;
+        cell_min = pwm_vol;
+    }
+
+    // Only apply the current reduction when balancing
+    // is off. (balancing is turned off regularly).
+    if (balancing == 0)
+    {
+        if (cell_max > MAX_CELL_V_CHG)
+        {
+            pwm_set_current(target_current - 1);
+        }
+        else if (cell_max == MAX_CELL_V_CHG)
+        {
+            // Stay here.
+        }
+        else if (pwm_curr < battery_capacity)
+        {
+            slow++;
+            if (slow > 10)
+            {
+                slow = 0;
+                pwm_set_current(target_current + 1);
+            }
+        }
+
+        // Complete at 0.1C
+        if (target_current <= battery_capacity / 10)
+        {
+            state = STATE_DONE;
+            error(ERROR_DONE);
+        }
+    }
+
+    // Make sure we don't go over the maximum voltage
+    calc = MAX_CELL_V * num_cells;
+	if (pwm_vol > calc)
+	{
+        buck_val = 0;
+        boost_val = 0;
+        pwm_set(buck_val, boost_val);
+
+        if (slow++ > 10)
+        {
+            error(ERROR_PACK_VOLTAGE);
+        }
+	}
 
     // Make sure we stay within the 50W power limit.
     calc = target_current;
@@ -185,13 +236,8 @@ void pwm_run_pid(void)
         target_current = calc;
     }
 
+    // Calculate the delta
 	delta = (int16_t)target_current - (int16_t)pwm_curr;
-
-    calc = MAX_CELL_V * num_cells;
-	if (pwm_vol > calc)
-	{
-        error(ERROR_PACK_VOLTAGE);
-	}
 
     // There is an occasional nasty over current condition.
     // Set all to zero and start ramping up again.
@@ -207,19 +253,33 @@ void pwm_run_pid(void)
     if (delta > 0)
     {
         if (delta_pid < 0)
+        {
             delta_pid = 0;
-
-        if ((last_delta >= delta) && ((last_delta - delta) < 7))
-            delta_pid++;
+        }
         else
-            delta_pid = 0;
+        {
+            if ((last_delta >= delta) && ((last_delta - delta) < 7))
+            {
+                //delta_pid++;
+                delta_pid = 1;
+            }
+            else
+            {
+                delta_pid = 0;
+            }
+        }
     }
     else
     {
         if (delta_pid > 0)
-            delta_pid = -delta_pid;
+        {
+            delta_pid = -delta_pid / 2;
+        }
         else
+        {
             delta_pid--;
+        }
+        delta_pid = -1;
     }
 
     last_delta = delta;
@@ -229,17 +289,11 @@ void pwm_run_pid(void)
         delta = -delta;
     }
 
-	if (delta >= 25)
+	if (delta >= 10)
 	{
         if (buck_val == PWM_TIMER_BASE)
         {
             boost_val += delta_pid;
-
-            // Limit the boost value to avoid short circuit.
-            if (boost_val > (PWM_TIMER_BASE / 4))
-            {
-                boost_val = (PWM_TIMER_BASE / 4);
-            }
         }
         else
         {
@@ -251,6 +305,12 @@ void pwm_run_pid(void)
         }
 
         if (boost_val < 0)
+        {
+            buck_val += boost_val;
+            boost_val = 0;
+        }
+
+        if (buck_val < PWM_TIMER_BASE)
         {
             boost_val = 0;
         }

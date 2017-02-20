@@ -25,14 +25,12 @@
 #include "balancer.h"
 #include "gpio.h"
 #include "error.h"
-#ifdef ENABLE_LCD
 #include "ssd1306.h"
-#endif
 
 //#define PWM_TESTING
 
 // ToDo: Move this to EEPROM.
-const uint16_t calibration[NUM_CHANNELS + 3] = {968, 966, 959, 971, 2600, 2568, 3426};	// Bi, Bv, Iv
+const uint16_t calibration[NUM_CHANNELS + 3] = {968, 966, 959, 971, 2600, 2575, 3426};	// Bi, Bv, Iv
 
 // Global 1ms system timer tick
 volatile uint32_t g_timer_tick = 0;
@@ -66,7 +64,6 @@ uint16_t battery_capacity;          // Calculated battery capacity.
 State state = STATE_CHECKING;       // Charger logic state.
 uint32_t timeout = 0;               // Timeout used during pack monitoring.
 uint8_t balancing;                  // Bitmask of channels being balanced.
-uint8_t cv_phase = 0;                  // Bitmask of channels being balanced.
 
 // Values for capacity calcualtion
 uint16_t c_v1;
@@ -93,9 +90,7 @@ void system_timer(void) __interrupt(23)
  */
 void _i2c_isr(void) __interrupt(19)
 {
-#ifdef ENABLE_LCD
     i2c_isr();
-#endif
 }
 
 /*
@@ -144,7 +139,6 @@ void system_init(void)
     enableInterrupts();
 }
 
-#ifdef ENABLE_LCD
 /*
  * When the LCD is enabled, this formats and displays the cell and
  * pack information on screen.
@@ -182,10 +176,7 @@ void update_lcd_info(void)
 
     // Battery Percentage
     lcd_set_cusor(90, 24);
-    if (balance_avg[0] > 3500)
-        lcd_write_digits((balance_avg[0] - 3500) / 7, 0, 1);
-    else
-        lcd_write_digits(0, 0, 1);
+    lcd_write_digits(((battery_voltage / num_cells) - 3500) / 7, 0, 1);
     lcd_write_string("%  ", 1);
 
     // Cell Voltages
@@ -225,7 +216,6 @@ void update_lcd_info(void)
     lcd_write_digits(g_timer_tick / 1000, 2, 0);
 #endif
 }
-#endif
 
 /*
  * Called once a second.
@@ -242,7 +232,7 @@ void monitor_and_charge_pack(void)
 #endif // FIXED_CHARGE_CURRENT
 
     // Check to see if we have at least 2 cells.
-    if (num_cells < 2)
+    if (num_cells == 0)
     {
         // Was the balance port removed?
         if (state >= STATE_MEASURING)
@@ -256,7 +246,7 @@ void monitor_and_charge_pack(void)
         uint8_t ok = 1; // Assume everything is ok for now.
 
         // Iterate through the balance connector checking the cells.
-        for (i=0; i<num_cells; ++i)
+        for (i=0; num_cells > 1 && i<num_cells; ++i)
         {
             // Check to see if we have a dead / missing cell
             // Check to see if any cells are below the safe charge voltage
@@ -284,24 +274,14 @@ void monitor_and_charge_pack(void)
         // Balance connector looks ok, now check the pack.
         if (ok)
         {
-        #if 0   // Do this in pwm.c more rapidly.
-            // Check to see that our battery voltage is within the
-            // correct range for the detected cells.
-            if ((battery_voltage > MAX_CELL_V * num_cells)
-                //|| ((battery_voltage < MIN_CELL_V * num_cells) && state > STATE_CHECKING) // Checked below before charging.
-                )
-            {
-                // The battery voltage doesn't match the cell count.
-                ok = 0;
-                if (timeout++ > 3)   // 3s timeout
-                {
-                    error(ERROR_PACK_VOLTAGE);
-                }
-            }
-            else
-        #endif
             if (battery_voltage > MIN_CELL_V * num_cells)
             {
+                // Don't charge for longer than CHARGE_TIMEOUT
+                if (g_timer_tick > CHARGE_TIMEOUT)
+                {
+                    error(ERROR_TIMEOUT);
+                }
+
                 switch (state)
                 {
                     case STATE_CHECKING:
@@ -331,7 +311,18 @@ void monitor_and_charge_pack(void)
                             state = STATE_CHARGING;
 #endif
 
+                            if (num_cells == 1)
+                            {
+                                battery_capacity = 750;
+                                pwm_set_current(battery_capacity);
+                                state = STATE_SINGLE_CELL;
+                            }
                         }
+                    break;
+
+                    case STATE_SINGLE_CELL:
+                        // Set the Cell count LEDs to Red.
+                        leds_set((1 << num_cells) - 1, 0, 0x3F);
                     break;
 
 #ifndef FIXED_CHARGE_CURRENT
@@ -395,41 +386,6 @@ void monitor_and_charge_pack(void)
                         // Set the Cell count LEDs to Red.
                         leds_set((1 << num_cells) - 1, 0, 0x3F);
 
-                        // Only apply the current reduction when balancing
-                        // is off. (balancing is turned off regularly).
-                        if (balancing == 0)
-                        {
-                            if (cell_max > MAX_CELL_V_CHG)
-                            {
-                                pwm_set_current(target_current - 50);
-                                cv_phase = 1;
-                            }
-                            else if (cv_phase > 0)
-                            {
-                                if (cell_max == MAX_CELL_V_CHG)
-                                {
-                                    // Stay here.
-                                }
-                                else if (battery_current < battery_capacity)
-                                {
-                                    pwm_set_current(target_current + 10);
-                                }
-
-                                // Complete at 0.1C (or 100mA, whichever is higher)
-                                if ((target_current < 100) || (target_current <= battery_capacity / 10))
-                                {
-                                    state = STATE_DONE;
-                                    error(ERROR_DONE);
-                                }
-                            }
-                        }
-
-                        // Don't charge for longer than CHARGE_TIMEOUT
-                        if (g_timer_tick > CHARGE_TIMEOUT)
-                        {
-                            error(ERROR_TIMEOUT);
-                        }
-
 #ifndef FIXED_CHARGE_CURRENT
                         // Re-measure pack regularly.
                         if (!cv_phase && timeout++ > BATTERY_MEASURE_TIME)
@@ -450,7 +406,7 @@ void monitor_and_charge_pack(void)
                 } // switch(state)
             } // Pack voltage range ok
         } // Balance cells ok
-    } // num_cells > 2
+    } // num_cells == 0
 }
 
 /*
@@ -459,14 +415,7 @@ void monitor_and_charge_pack(void)
  */
 void monitor_input(void)
 {
-#if 0
-    uint8_t input_cells = input_voltage / 3300;
-
-    // Make sure we don't discharge the supply pack too far.
-    if (state > STATE_CHECKING && (input_voltage < input_cells * 3500 || input_voltage < 10000))
-#else
     if (state > STATE_CHECKING && input_voltage < 10000)
-#endif
     {
         error(ERROR_INPUT_VOLTAGE);
     }
@@ -489,7 +438,6 @@ int main(void)
     adc_init();
     balancer_init();
 
-#ifdef ENABLE_LCD
     // Initialize the LCD
     lcd_init();
 #ifdef ENABLE_EXTRA_LCD_INFO
@@ -499,7 +447,6 @@ int main(void)
     lcd_write_string(" Vi/Vb  It/Ib  mAh/% ", 0);
     lcd_set_cusor(0,32);
     lcd_write_string(" Balance Port Values ", 0);
-#endif
 #endif
 
     // Disable the battery FET
@@ -547,6 +494,15 @@ int main(void)
                 if (adc_values[i] != 0)
                 {
                     num_cells++;
+                }
+            }
+
+            // Special case for single cell charging
+            if (num_cells == 0)
+            {
+                if (battery_voltage > MIN_CELL_V && battery_voltage < MAX_CELL_V)
+                {
+                    num_cells = 1;
                 }
             }
 
@@ -602,9 +558,7 @@ int main(void)
             // Reset the average counter
             average_count = 0;
 
-#ifdef ENABLE_LCD
             update_lcd_info();
-#endif
 
 #ifndef PWM_TESTING
             monitor_input();

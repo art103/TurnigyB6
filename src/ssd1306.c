@@ -25,9 +25,6 @@
 #include "error.h"
 //#include "lcdfont_medium.h"
 
-#ifdef ENABLE_LCD
-
-
 #define LCD_WIDTH 128
 #define LCD_HEIGHT 64
 
@@ -371,5 +368,3 @@ void lcd_set_cusor(uint8_t x, uint8_t y)
     ssd1306_command(SSD1306_CMD_SET_HIGH_COLUMN | ((x >> 4) & 0x0f)); // hi col
     ssd1306_command(SSD1306_CMD_SET_PAGE_START  | (y / 8)); // row
 }
-
-#endif

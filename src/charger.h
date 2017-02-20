@@ -22,7 +22,7 @@
 #define NUM_CHANNELS    (4)     // Number of balance / LED channels.
 
 #define MAX_CELL_V      (4250)  // Charge Abort voltage
-#define MAX_CELL_V_CHG  (4180)  // Charge Termination voltage
+#define MAX_CELL_V_CHG  (4170)  // Charge Termination voltage
 #define MIN_CELL_V      (2900)  // Minimum voltage to register a cell as usable
 #define CELL_PRESENT_V  (1500)  // Value to register a cell as present
 #define PACK_PRESENT_V  (2000)  // Value above which to register the main connector present.
@@ -39,7 +39,6 @@
 
 #define CHARGE_TIMEOUT          (5400000)   // How long to charge before aborting.
 
-#define ENABLE_LCD
 #define ENABLE_EXTRA_LCD_INFO               // Extra LCD output (may exceed the flash limit).
 
 // Force a specific charge current and don't measure the pack (debugging).
@@ -60,6 +59,7 @@ typedef enum
 {
     STATE_ERROR,
     STATE_CHECKING,
+    STATE_SINGLE_CELL,
     STATE_MEASURING,
     STATE_CHARGING,
     STATE_DONE
