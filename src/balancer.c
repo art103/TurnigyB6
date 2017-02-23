@@ -98,6 +98,11 @@ void balance_pack(void)
 	{
 		if (call_count == 3)
 		{
+            if (cell_max >= MAX_CELL_V_CHG)
+            {
+                state = STATE_TOPPING;
+            }
+
 			// Cells have had time to settle, check them again.
 			if ((cell_max - cell_min) > BALANCE_THRESHOLD)
 			{

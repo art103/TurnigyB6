@@ -22,13 +22,13 @@
 #define NUM_CHANNELS    (4)     // Number of balance / LED channels.
 
 #define MAX_CELL_V      (4250)  // Charge Abort voltage
-#define MAX_CELL_V_CHG  (4170)  // Charge Termination voltage
+#define MAX_CELL_V_CHG  (4200)  // Charge Termination voltage
 #define MIN_CELL_V      (2900)  // Minimum voltage to register a cell as usable
 #define CELL_PRESENT_V  (1500)  // Value to register a cell as present
 #define PACK_PRESENT_V  (2000)  // Value above which to register the main connector present.
 
-#define INITIAL_CHARGE_CURRENT  (1300)       // Measurement charge current (mA)
-#define MAX_CHARGE_CURRENT      (5000)      // Maximum current output (mA)
+#define INITIAL_CHARGE_CURRENT  (1300)      // Measurement charge current (mA)
+#define MAX_CHARGE_CURRENT      (2200)      // Maximum current output (mA)
 #define MAX_CHARGE_POWER        (50000000)  // Maximum power output (mW)
 #define CHARGE_RATE             (1)         // Charge rate in C
 
@@ -62,6 +62,7 @@ typedef enum
     STATE_SINGLE_CELL,
     STATE_MEASURING,
     STATE_CHARGING,
+    STATE_TOPPING,
     STATE_DONE
 } State;
 extern State state;

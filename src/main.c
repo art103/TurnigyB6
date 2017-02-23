@@ -30,7 +30,7 @@
 //#define PWM_TESTING
 
 // ToDo: Move this to EEPROM.
-const uint16_t calibration[NUM_CHANNELS + 3] = {968, 966, 959, 971, 2600, 2575, 3426};	// Bi, Bv, Iv
+const uint16_t calibration[NUM_CHANNELS + 3] = {968, 966, 959, 971, 2600, 2565, 3426};	// Bi, Bv, Iv
 
 // Global 1ms system timer tick
 volatile uint32_t g_timer_tick = 0;
@@ -176,7 +176,7 @@ void update_lcd_info(void)
 
     // Battery Percentage
     lcd_set_cusor(90, 24);
-    lcd_write_digits(((battery_voltage / num_cells) - 3500) / 7, 0, 1);
+    lcd_write_digits((cell_max - 3500) / 7, 0, 1);
     lcd_write_string("%  ", 1);
 
     // Cell Voltages
@@ -202,10 +202,13 @@ void update_lcd_info(void)
             lcd_write_string(" Checking  t:        ", 0);
         break;
         case STATE_MEASURING:
-            lcd_write_string(" Measuring", 0);
+            //lcd_write_string(" Measuring", 0);
         break;
         case STATE_CHARGING:
             lcd_write_string(" Charging ", 0);
+        break;
+        case STATE_TOPPING:
+            //lcd_write_string(" Topping  ", 0);
         break;
         case STATE_DONE:
             lcd_write_string(" Finished ", 0);
@@ -302,6 +305,7 @@ void monitor_and_charge_pack(void)
                             // Start charge at measuring current.
                             battery_capacity = INITIAL_CHARGE_CURRENT;
                             state = STATE_MEASURING;
+                            pwm_set_current(battery_capacity * CHARGE_RATE);
 
 
                             // Manual override.
@@ -311,6 +315,7 @@ void monitor_and_charge_pack(void)
                             state = STATE_CHARGING;
 #endif
 
+                            // Special case for single cells.
                             if (num_cells == 1)
                             {
                                 battery_capacity = 750;
@@ -335,68 +340,75 @@ void monitor_and_charge_pack(void)
                         }
 
                         // Set the Cell count LEDs to Green.
-                        leds_set(0, (1 << num_cells) - 1, 0x3F);
+                        //leds_set(0, (1 << num_cells) - 1, 0x3F);
+                        //leds_set(0, (1 << measuring_state) - 1, 0x3F);
 
 						switch (measuring_state)
 						{
 							case 0:
-								pwm_set_current(battery_capacity * CHARGE_RATE);
+                                // Starting point
+                                c_v1 = balance_avg[0];
+                                c_mah = battery_added;
+                                measuring_state = 1;
 							break;
 
 							case 1:
-                                // Get to within 100mA of target.
-                                if (battery_current < target_current - 100)
-                                    measuring_state = 0;
-							break;
-
-							case BATTERY_SETTLE_TIME:
-                                c_v1 = battery_voltage;
-                                c_mah = battery_added;
-							break;
-
-							case BATTERY_SETTLE_TIME + BATTERY_MEASURE_TIME:
-                                c_v2 = battery_voltage;
-
-                                if (c_v2 > c_v1)
-                                {
-                                    calc = (battery_added - c_mah) * (4200 - 3300);
-                                    calc /= (c_v2 - c_v1);
-                                    calc *= num_cells;
-                                    calc /= 1000;
-
-                                    battery_capacity = calc;
-
-                                    if (battery_capacity > target_current)
-                                    {
-                                        pwm_set_current(target_current + 100);
-                                    }
-
-                                    c_v1 = battery_voltage;
+							    if ((battery_added - c_mah) > 10000)
+							    {
+                                    c_v1 = balance_avg[0];
                                     c_mah = battery_added;
 
-                                    state = STATE_CHARGING;
+                                    measuring_state = 2;
                                 }
 							break;
+
+							case 2:
+                                // Wait for an increase of 5mV per cell
+                                if ((balance_avg[0] > c_v1) &&
+                                    (balance_avg[0] - c_v1 > 20))
+                                {
+                                    measuring_state = 3;
+                                    c_v2 = balance_avg[0];
+                                }
+							break;
+
+							case 3:
+                                calc = (battery_added - c_mah) * (4200 - 3300);
+                                calc /= (c_v2 - c_v1);
+                                //calc *= num_cells;
+                                calc /= 1000; // uAh to mAh
+
+                                battery_capacity = calc;
+
+                                if (battery_capacity > target_current)
+                                {
+                                    pwm_set_current(target_current + 100);
+                                }
+                                state = STATE_CHARGING;
+							break;
 						}
-						measuring_state++;
                     break;
 #endif // FIXED_CHARGE_CURRENT
 
                     case STATE_CHARGING:
                         // Set the Cell count LEDs to Red.
                         leds_set((1 << num_cells) - 1, 0, 0x3F);
-
-#ifndef FIXED_CHARGE_CURRENT
+#if 0//ndef FIXED_CHARGE_CURRENT
                         // Re-measure pack regularly.
-                        if (!cv_phase && timeout++ > BATTERY_MEASURE_TIME)
+                        if (timeout++ > BATTERY_MEASURE_TIME)
                         {
                             balancer_off();
                             // Prepare the measurement cycle.
-                            measuring_state = BATTERY_SETTLE_TIME + BATTERY_MEASURE_TIME - 2;
+                            measuring_state = 0;
                             state = STATE_MEASURING;
                             timeout = 0;
                         }
 #endif // FIXED_CHARGE_CURRENT
+                    break;
+
+                    case STATE_TOPPING:
+                        state = STATE_DONE;
+                        error(ERROR_DONE);
                     break;
 
                     case STATE_DONE:

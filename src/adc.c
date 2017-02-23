@@ -141,7 +141,7 @@ void adc_sweep(void)
 
         adc_done = 0;
 
-        adc_values[adc_input] = sample_total / NUMER_OF_SAMPLES;
+        adc_values[adc_input] = sample_total;
         sample_total = 0;
         conversions = 0;
 
@@ -154,7 +154,7 @@ void adc_sweep(void)
             case 2:
             case 3:
                 // Apply per-channel calibration values
-                tmp = (uint32_t)adc_values[adc_input] * (uint32_t)calibration[adc_input] / 100;
+                tmp = (uint32_t)adc_values[adc_input] * (uint32_t)calibration[adc_input] / 100 / NUMER_OF_SAMPLES;
 
                 // Only report cells that are above our detection threshold
                 if (tmp < CELL_PRESENT_V)
@@ -169,23 +169,23 @@ void adc_sweep(void)
             case NUM_CHANNELS:
                 tmp = adc_values[NUM_CHANNELS];
                 tmp *= calibration[NUM_CHANNELS];
-                pwm_curr = tmp / 100;
-                batt_curr_avg += tmp / 100;
+                pwm_curr = tmp / 100 / NUMER_OF_SAMPLES;
+                batt_curr_avg += pwm_curr;
             break;
 
             // Battery Voltage
             case NUM_CHANNELS + 1:
                 tmp = adc_values[NUM_CHANNELS + 1];
                 tmp *= calibration[NUM_CHANNELS + 1];
-                pwm_vol = tmp / 100;
-                batt_vol_avg += tmp / 100;
+                pwm_vol = tmp / 100 / NUMER_OF_SAMPLES;
+                batt_vol_avg += pwm_vol;
             break;
 
             // Input Voltage
             case NUM_CHANNELS + 2:
                 tmp = adc_values[NUM_CHANNELS + 2];
                 tmp *= calibration[NUM_CHANNELS + 2];
-                input_vol_avg += tmp / 100;
+                input_vol_avg += tmp / 100 / NUMER_OF_SAMPLES;
             break;
 
             default:
